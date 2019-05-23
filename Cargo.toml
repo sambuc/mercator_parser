@@ -1,0 +1,22 @@
+[package]
+name = "parser"
+version = "0.1.0"
+authors = ["Lionel Sambuc <lionel.sambuc@gmail.com>"]
+edition = "2018"
+build = "build.rs" # LALRPOP preprocessing
+
+[lib]
+name = "parser"
+path = "src/lib.rs"
+
+[[bin]]
+name = "parser-driver"
+path = "src/main.rs"
+
+[dependencies]
+lalrpop-util = "0.17.0"
+regex = "0.2.1"
+
+[build-dependencies]
+lalrpop = "0.17.0"
+
