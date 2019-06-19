@@ -18,11 +18,11 @@ projection_operators
  *
  * If it is provided, it MUST resolve to a NUMBER. */
 nifti_operator
-    : 'nifti' '(' ( selector ',' )? bag_expression ')'
+    : 'nifti' '(' ( STRING ',' )? ( selector ',' )? bag_expression ')'
     ;
 
 json_operator
-    : 'json' '(' jslt ',' bag_expression ')'
+    : 'json' '(' jslt ',' bag_expression ( ',' STRING )? ')'
     ;
 
 jslt

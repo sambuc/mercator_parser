@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use crate::ast;
-use crate::ast::*;
+use crate::symbols;
+use crate::database::space;
 
 grammar;
 
@@ -10,7 +10,7 @@ grammar;
 //*********************************************************************/
 pub Query = { Projections? };
 
-Projections: ast::Projection = {
+Projections: symbols::Projection = {
     NiftiOperator,
     JsonOperator
 };
@@ -19,18 +19,39 @@ Projections: ast::Projection = {
 // each position where there is a point in bag_expression.
 //
 // If it is provided, it MUST resolve to a NUMBER.
-NiftiOperator: ast::Projection = {
-    "nifti" "(" <s:( Selector "," )?> <b:Bags> ")" =>
+NiftiOperator: symbols::Projection = {
+    "nifti" "("
+        <s:( Selector "," )?>
+        <b:Bags>
+        <rs:( "," <String> )?>
+    ")" => {
+        let space_id = match rs {
+            Some(id) => id,
+            None => space::name().clone(),
+        };
+
         if let Some((sel, _)) = s {
-            Projection::Nifti(sel, b)
+           symbols::Projection::Nifti(space_id, sel, b)
         } else {
-            Projection::Nifti(Vec::new(), b)
+          symbols::Projection::Nifti(space_id, symbols::LiteralSelector(Vec::new()), b)
         }
+
+    }
 };
 
-JsonOperator: ast::Projection = {
-    "json" "(" <f:JsonValues> "," <b:Bags> ")" =>
-        Projection::JSON(f, b)
+JsonOperator: symbols::Projection = {
+    "json" "("
+        <f:JsonValues> ","
+        <b:Bags>
+        <rs:( "," <String> )?>
+    ")" => {
+        let space_id = match rs {
+            Some(id) => id,
+            None => space::name().clone(),
+        };
+
+        symbols::Projection::JSON(space_id, f, b)
+    }
 };
 
 //*********************************************************************/
@@ -41,73 +62,73 @@ JsonOperator: ast::Projection = {
 //  https://github.com/antlr/grammars-v4/blob/master/json/JSON.g4
 //
 // Some of the parser / lexer rules are in the imported grammar as well.
-JsonValues: ast::JsonValue = {
-    String => JsonValue::String(<>),
+JsonValues: symbols::JsonValue = {
+    String => symbols::JsonValue::String(<>),
     JsonNumber => <>,
     JsonObj => <>,
     JsonArray => <>,
-    "true" => JsonValue::Bool(true),
-    "false" => JsonValue::Bool(false),
-    "null" => JsonValue::Null,
+    "true" => symbols::JsonValue::Bool(true),
+    "false" => symbols::JsonValue::Bool(false),
+    "null" => symbols::JsonValue::Null,
     // Support reference to values from the selected bag.
-    Selector => JsonValue::Selector(<>),
-    Aggregations => JsonValue::Aggregation(<>)
+    Selector => symbols::JsonValue::Selector(<>),
+    Aggregations => symbols::JsonValue::Aggregation(<>)
 };
 
-JsonObj: ast::JsonValue = {
+JsonObj: symbols::JsonValue = {
     "{" <exp:( JsonPair ( "," JsonPair )* )?> "}" => {
         if let Some((elem, list)) = exp {
-            let mut values: Vec<(String, JsonValue)> = vec![elem];
+            let mut values = vec![elem];
 
             for v in list {
                 let (_, pair) = v;
                 values.push(pair.clone());
             }
 
-            JsonValue::Object(values)
+            symbols::JsonValue::Object(values)
         } else {
-            JsonValue::Object(Vec::new())
+            symbols::JsonValue::Object(Vec::new())
         }
     }
 };
 
-JsonPair: (String, ast::JsonValue) = {
+JsonPair: (String, symbols::JsonValue) = {
     <s:String> ":" <v:JsonValues> => (s, v)
 };
 
-JsonArray: ast::JsonValue = {
+JsonArray: symbols::JsonValue = {
     "[" <exp:( JsonValues ( "," JsonValues )* )?> "]" => {
         if let Some((elem, list)) = exp {
-            let mut values: Vec<JsonValue> = vec![elem];
+            let mut values = vec![elem];
 
             for v in list.iter() {
                 let (_, val) = v;
                 values.push(val.clone());
             }
 
-            JsonValue::Array(values)
+            symbols::JsonValue::Array(values)
         } else {
-            JsonValue::Array(Vec::new())
+            symbols::JsonValue::Array(Vec::new())
         }
     }
 };
 
 // The bag expression is implicit here, as this is te
 // second argument to the json operator
-Aggregations: ast::Aggregation = {
+Aggregations: symbols::Aggregation = {
     "count" "(" <d:"distinct"?> <s:Selector> ")" => {
             if let Some(_) = d {
-                Aggregation::Count(true, s)
+                symbols::Aggregation::Count(true, s)
             } else {
-                Aggregation::Count(false, s)
+                symbols::Aggregation::Count(false, s)
             }
         },
     "sum" "(" <Selector> ")" =>
-        Aggregation::Sum(<>),
+        symbols::Aggregation::Sum(<>),
     "min" "(" <Selector> ")" =>
-        Aggregation::Min(<>),
+        symbols::Aggregation::Min(<>),
     "max" "(" <Selector> ")" =>
-        Aggregation::Max(<>),
+        symbols::Aggregation::Max(<>),
 };
 
 //*********************************************************************/
@@ -116,7 +137,7 @@ Aggregations: ast::Aggregation = {
 pub Filters = { Bags };
 
 // All these expressions generate bags.
-Bags: ast::Bag = {
+Bags: symbols::Bag = {
     // Bag Operators
     Distinct,
     Filter,
@@ -129,49 +150,65 @@ Bags: ast::Bag = {
     Outside,
     // When used directly here, the inside() operation on the shape is
     // implied.
-    Shapes => Bag::Inside(<>)
+    Shapes => symbols::Bag::Inside(<>)
 };
 
 //*********************************************************************/
 // BAG OPERATORS                                                      */
 //*********************************************************************/
-Distinct: ast::Bag = {
+Distinct: symbols::Bag = {
     "distinct" "(" <Bags> ")" =>
-        Bag::Distinct(Box::new(<>))
+        symbols::Bag::Distinct(Box::new(<>))
 };
 
 // Returns all the points which are NOT part of the bag.
-Complement: ast::Bag = {
+Complement: symbols::Bag = {
     "complement" "(" <Bags> ")" =>
-        Bag::Complement(Box::new(<>))
+        symbols::Bag::Complement(Box::new(<>))
 };
 
 // Returns points which are part of both left and right sets.
-Intersection: ast::Bag = {
+Intersection: symbols::Bag = {
     "intersection" "(" <lh:Bags> "," <rh:Bags> ")" =>
-        Bag::Intersection(Box::new(lh), Box::new(rh))
+        symbols::Bag::Intersection(Box::new(lh), Box::new(rh))
 };
 
 // Returns points which are either part of left or right sets
 // (or both).
-Union: ast::Bag = {
+Union: symbols::Bag = {
     "union" "(" <lh:Bags> "," <rh:Bags> ")" =>
-        Bag::Union(Box::new(lh), Box::new(rh))
+        symbols::Bag::Union(Box::new(lh), Box::new(rh))
 };
 
 // Filters point so that points part of the resulting bag respect
 // the predicate.
-Filter: ast::Bag = {
+Filter: symbols::Bag = {
 //     "filter" "(" <p:Predicates> "," <b:Bags> ")" =>
     "filter" "(" <b:Bags> ")" =>
-        Bag::Filter(None, Some(Box::new(b))),
+        symbols::Bag::Filter(None, Box::new(b)),
     "filter" "(" <p:Predicates> <b:("," <Bags> )?> ")" => match b {
-        Some(b) => Bag::Filter(Some(p), Some(Box::new(b))),
-        None => Bag::Filter(Some(p), None),
+        Some(b) => symbols::Bag::Filter(Some(p), Box::new(b)),
+        None => {
+            let v = space::bounding_box(space::name());
+            let mut positions = Vec::new();
+            for point in v {
+                let mut position = Vec::new();
+                for c in point {
+                    position.push(symbols::LiteralNumber::Int(*c))
+                }
+                positions.push(symbols::LiteralPosition(position));
+            }
+            let bb = symbols::Shape::HyperRectangle(
+                space::name().clone(),
+                positions
+            );
+
+            symbols::Bag::Filter(Some(p), Box::new(symbols::Bag::Inside(bb)))
+        }
     }
 };
 
-Predicates: ast::Predicate = {
+Predicates: symbols::Predicate = {
     Less,
     Greater,
     Equal,
@@ -180,41 +217,41 @@ Predicates: ast::Predicate = {
     Or
 };
 
-Less: ast::Predicate = {
+Less: symbols::Predicate = {
     "<" "(" <v:Positions> "," <literal:Position> ")" => {
-        Predicate::Less(v, literal)
+        symbols::Predicate::Less(v, literal)
     }
 };
 
-Greater: ast::Predicate = {
+Greater: symbols::Predicate = {
     ">" "(" <v:Positions> "," <literal:Position> ")" => {
-        Predicate::Greater(v, literal)
+        symbols::Predicate::Greater(v, literal)
     }
 };
 
-Equal: ast::Predicate = {
+Equal: symbols::Predicate = {
     "=" "(" <v:Positions> "," <literal:Position> ")" => {
-        Predicate::Equal(v, literal)
+        symbols::Predicate::Equal(v, literal)
     }
 };
 
-Not: ast::Predicate = {
+Not: symbols::Predicate = {
     "!" "(" <p:Predicates> ")" =>
-        Predicate::Not(Box::new(p))
+        symbols::Predicate::Not(Box::new(p))
 };
 
-And: ast::Predicate = {
+And: symbols::Predicate = {
     "&" "(" <lh:Predicates> "," <rh:Predicates> ")" =>
-        Predicate::And(Box::new(lh), Box::new(rh))
+        symbols::Predicate::And(Box::new(lh), Box::new(rh))
 };
 
-Or: ast::Predicate = {
+Or: symbols::Predicate = {
     "|" "(" <lh:Predicates> "," <rh:Predicates> ")" =>
-        Predicate::Or(Box::new(lh), Box::new(rh))
+        symbols::Predicate::Or(Box::new(lh), Box::new(rh))
 };
 
 // Arbitrary bag of positions.
-Bag: ast::Bag = {
+Bag: symbols::Bag = {
     "bag" "{" <elem:Bags> <list:("," Bags )*> "}" => {
         let mut bags = vec![elem];
 
@@ -222,7 +259,7 @@ Bag: ast::Bag = {
             bags.push(b);
         }
 
-        Bag::Bag(bags)
+        symbols::Bag::Bag(bags)
     }
 };
 
@@ -240,15 +277,15 @@ Bag: ast::Bag = {
 // of the cube [0,0], [1,1].
 
 // Returns the set of points outside the shape, (face included)
-Outside: ast::Bag = {
+Outside: symbols::Bag = {
     "outside" "(" <Shapes> ")" =>
-        Bag::Outside(<>)
+        symbols::Bag::Outside(<>)
 };
 
 // Returns the set of points inside the shape, (face included)
-Inside: ast::Bag = {
+Inside: symbols::Bag = {
     "inside" "(" <Shapes> ")" =>
-        Bag::Inside(<>)
+        symbols::Bag::Inside(<>)
 };
 
 //*********************************************************************/
@@ -257,7 +294,7 @@ Inside: ast::Bag = {
 
 // Shapes are defined in terms of POSITION, a.k.a a LiteralPosition
 // value, which is not a POSITIONS, which might be a filter for example.
-Shapes: ast::Shape = {
+Shapes: symbols::Shape = {
     Point,
     HyperRectangle,
     HyperSphere,
@@ -266,30 +303,50 @@ Shapes: ast::Shape = {
 
 // If the hyperrectangle is aligned with the axes, then two points are
 // enough, if not we need all the points to be specified.
-HyperRectangle: ast::Shape = {
+HyperRectangle: symbols::Shape = {
     "hyperrectangle" "{"
         <l:Position> "," <h:Position>
         <list:( "," Position "," Position )*>
+        <rs:( "," <String> )?>
     "}" => {
+        let space_id = match rs {
+            Some(id) => id,
+            None => space::name().clone(),
+        };
         let mut pos = vec![l, h];
         for (_, lh, _, rh) in list.iter() {
             pos.push(lh.clone());
             pos.push(rh.clone());
         }
-        Shape::HyperRectangle(pos)
+        symbols::Shape::HyperRectangle(space_id, pos)
     }
 };
 
 // A hypersphere is defined by its center and a radius, independantly
 // of the number of dimensions of the space.
-HyperSphere: ast::Shape = {
-    "hypersphere" "{" <c:Position> "," <r:PositiveNumber> "}" =>
-        Shape::HyperSphere(c, r)
+HyperSphere: symbols::Shape = {
+    "hypersphere" "{"
+        <c:Position> "," <r:PositiveNumber>
+        <rs:( "," <String> )?>
+    "}" => {
+        let space_id = match rs {
+            Some(id) => id,
+            None => space::name().clone(),
+        };
+
+        symbols::Shape::HyperSphere(space_id, c, r)
+    }
 };
 
-Point: ast::Shape = {
-    "point" "{" <Position> "}" =>
-        Shape::Point(<>)
+Point: symbols::Shape = {
+    "point" "{" <pos:Position> <rs:( "," <String> )?> "}" => {
+         let space_id = match rs {
+            Some(id) => id,
+            None => space::name().clone(),
+        };
+
+        symbols::Shape::Point(space_id, pos)
+    }
 };
 
 // Define a shape as the non-zero values in a NIfTI object, defined by
@@ -299,14 +356,18 @@ Point: ast::Shape = {
 //     rotation: [ position+ ], // Optional, no rotation by default
 //     bytes: uri(STRING)       // uri to the NIfTI object
 //   }
-Nifti: ast::Shape = {
+Nifti: symbols::Shape = {
     "nifti" "{"
-        String ","
-        ( Position "," )?
-        ( "[" Position ( "," Position)* "]" "," )?
-        ByteProvider
+        <o:( Position "," )?>
+        <rotation:( "[" Position ( "," Position)* "]" "," )?>
+        <data:ByteProvider>
+        <rs:( "," <String> )?>
     "}" => {
-        Shape::Nifti()
+        let space_id = match rs {
+            Some(id) => id,
+            None => space::name().clone(),
+        };
+        symbols::Shape::Nifti(space_id)
     }
 };
 
@@ -321,44 +382,44 @@ ByteProvider = { "uri" "(" String ")" };
 
 // Always returns a vector of numbers, a.k.a a position (a scalar will
 // be represented as a vector of one element)
-Positions: ast::Position = {
+Positions: symbols::Position = {
     StrCmpICase,
     StrCmp,
-    Selector => Position::Selector(<>),
-    Position => Position::LiteralPosition(<>)
+    Selector => symbols::Position::Selector(<>),
+    Position => symbols::Position::Literal(<>)
 };
 
 // Compare lexicographically two strings, and returns a `position`:
 //  [-1] : String is lexicographically before,
 //  [ 0] : is equal,
 //  [ 1] : is after.
-StrCmp: ast::Position = {
+StrCmp: symbols::Position = {
     "str_cmp" "(" <s:Selector> "," <v:String> ")" => {
-        Position::StrCmp(s, v)
+        symbols::Position::StrCmp(s, v)
     }
 };
 
 // Same, but case insensitive.
-StrCmpICase: ast::Position = {
+StrCmpICase: symbols::Position = {
     "str_cmp_ignore_case" "(" <s:Selector> "," <v:String> ")" => {
-        Position::StrCmpICase(s, v)
+        symbols::Position::StrCmpICase(s, v)
     }
 };
 
 // FIXME: FIELDS are expected to be exisiting in the data model. Root Object is assumed to be the type of the ressource on which the POST call was done.
-Selector = {
-    ( <Field> )+
+Selector: symbols::LiteralSelector = {
+    ( <Field> )+ => symbols::LiteralSelector(<>)
 };
 
-Position: ast::LiteralPosition = {
+Position: symbols::LiteralPosition = {
     "[" <element:Number> <list:( "," <Number>)*> "]" => {
-        let mut pos: LiteralPosition = vec![element];
+        let mut pos = vec![element];
 
         for e in list.iter() {
             pos.push(e.clone());
         }
 
-        pos
+        symbols::LiteralPosition(pos)
     }
 };
 
@@ -370,72 +431,75 @@ Position: ast::LiteralPosition = {
 //  1. start with a dot ('.')
 //  2. optionnally followed by a field name consisting of a letter or
 //     underscore, followed by letters, numbers or underscore,
-//  3. optionnally followed by brakets enclosing an natural number
+//  3. optionnally followed by brakets enclosing a natural number
 //     denoting an offset in a list or array.
-Field: Field = {
+Field: symbols::Field = {
     <n:r"[.]([a-zA-Z_][[a-zA-Z_0-9]]*)?([\[](0|[1-9][0-9]*)[\]])?"> => {
         if let Some(pos) = n.rfind('[') {
             let name = &n[1..pos];
             let index = &n[(pos+1)..(n.len()-1)];
             let index = usize::from_str(index).unwrap();
-            Field(String::from(name), Some(index))
+            symbols::Field(String::from(name), Some(index))
         } else {
             let name = &n[1..];
-            Field(String::from(name), None)
+            symbols::Field(String::from(name), None)
         }
     }
 };
 
 String: String = {
-    r#"["]([\\](["\\/bfnrt]|u[0-9a-fA-F]{4})|[^"\\\u0000-\u001F])*["]"# =>
-        String::from(<>)
+    r#"["]([\\](["\\/bfnrt]|u[0-9a-fA-F]{4})|[^"\\\u0000-\u001F])*["]"# => {
+        let s = <>;
+        let l = s.len() - 1;
+        s[1..l].to_string()
+    }
 };
 
 //*********************************************************************/
 // TOKENS - NUMBERS                                                   */
 //*********************************************************************/
 // We define 3 kinds of number, to avoid ambiguities in the rules.
-JsonNumber: ast::JsonValue = {
+JsonNumber: symbols::JsonValue = {
     <s:"-"?> <v:Num> => match s {
-        None => JsonValue::JsonNumber(v),
+        None => symbols::JsonValue::JsonNumber(v),
         Some(_) => match v {
-            LiteralNumber::Int(x) => JsonValue::JsonNumber(LiteralNumber::Int(-x)),
-            LiteralNumber::Float(x) => JsonValue::JsonNumber(LiteralNumber::Float(-x))
+            symbols::LiteralNumber::Int(x) => symbols::JsonValue::JsonNumber(symbols::LiteralNumber::Int(-x)),
+            symbols::LiteralNumber::Float(x) => symbols::JsonValue::JsonNumber(symbols::LiteralNumber::Float(-x))
         }
     }
 };
 
-PositiveNumber: ast::LiteralNumber = { "+"? <v:Num> => v };
+PositiveNumber: symbols::LiteralNumber = { "+"? <v:Num> => v };
 
-Number: ast::LiteralNumber = {
+Number: symbols::LiteralNumber = {
     "+" <v:Num> => v,
     "-" <v:Num> => match v {
-            LiteralNumber::Int(x) => LiteralNumber::Int(-x),
-            LiteralNumber::Float(x) => LiteralNumber::Float(-x)
+            symbols::LiteralNumber::Int(x) => symbols::LiteralNumber::Int(-x),
+            symbols::LiteralNumber::Float(x) => symbols::LiteralNumber::Float(-x)
         },
     <v:Num> => v
 
 };
 
-Num: ast::LiteralNumber = {
+Num: symbols::LiteralNumber = {
     r"0([.][0-9]+([eE][+\-]?(0|[1-9][0-9]*))?)?"
         => {
            if let Ok(v) = i64::from_str(<>) {
-                LiteralNumber::Int(v)
+                symbols::LiteralNumber::Int(v)
             } else {
                 // Either parsing as a float succeed or we pass along
                 // the error
-                LiteralNumber::Float(f64::from_str(<>).unwrap())
+                symbols::LiteralNumber::Float(f64::from_str(<>).unwrap())
             }
     },
     r"[1-9][0-9]*([.][0-9]+)?([eE][+\-]?(0|[1-9][0-9]*))?"
         => {
             if let Ok(v) = i64::from_str(<>) {
-                LiteralNumber::Int(v)
+                symbols::LiteralNumber::Int(v)
             } else {
                 // Either parsing as a float succeed or we pass along
                 // the error
-                LiteralNumber::Float(f64::from_str(<>).unwrap())
+                symbols::LiteralNumber::Float(f64::from_str(<>).unwrap())
             }
         }
 };

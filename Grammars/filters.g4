@@ -134,33 +134,38 @@ hyperrectangle
     : 'hyperrectangle' '{'
           position ',' position
           ( ',' position ',' position )*
+          ( ',' STRING )?
        '}'
     ;
 
 /* A hypersphere is defined by its center and a radius, independantly
  * of the number of dimensions of the space. */
 hypersphere
-    : 'hypersphere' '{' position ( ',' positive_number ) '}'
+    : 'hypersphere' '{'
+           position
+           ',' positive_number
+           ( ',' STRING )?
+        '}'
     ;
 
 point
-    : 'point' '{' position '}'
+    : 'point' '{' position ( ',' STRING )? '}'
     ;
 
 /* Define a shape as the non-zero values in a NIfTI object, defined by
  *   nifti{
- *     spaceId: string,
  *     lower_corner: position,  // Optional, default to the origin
  *     rotation: [ position+ ], // Optional, no rotation by default
- *     bytes: uri(STRING)       // uri to the NIfTI object
+ *     bytes: uri(STRING),      // uri to the NIfTI object
+ *     spaceId: string
  *   }
  */
 nifti
     : 'nifti' '{'
-        STRING ','
         (position ',' )?
         ( '[' position ( ',' position )* ']' ',' )?
-        byte_provider
+        byte_provider ','
+        STRING
       '}'
     ;
 
