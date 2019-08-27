@@ -1,48 +1,48 @@
-use super::expression::Predictor;
+use mercator_db::DataBase;
+
+use super::expressions::Predictor;
 use super::symbols::*;
 
-use super::database::space;
-
 impl Predictor for Projection {
-    fn predict(&self) -> f64 {
+    fn predict(&self, db: &DataBase) -> Result<f64, String> {
         match self {
-            Projection::Nifti(_, _, bag) => bag.predict(),
-            Projection::JSON(_, _, bag) => bag.predict(),
+            Projection::Nifti(_, _, bag) => bag.predict(db),
+            Projection::JSON(_, _, bag) => bag.predict(db),
         }
     }
 }
 
 impl Predictor for Bag {
-    fn predict(&self) -> f64 {
+    fn predict(&self, db: &DataBase) -> Result<f64, String> {
         match self {
-            Bag::Distinct(bag) => bag.predict(),
-            Bag::Filter(_, bag) => bag.predict(),
-            Bag::Complement(bag) => space::max_volume(bag.space()) - bag.predict(),
+            Bag::Distinct(bag) => bag.predict(db),
+            Bag::Filter(_, bag) => bag.predict(db),
+            Bag::Complement(bag) => Ok(db.space(bag.space())?.volume() - bag.predict(db)?),
             Bag::Intersection(lh, rh) => {
-                let l = lh.predict();
-                let r = rh.predict();
+                let l = lh.predict(db)?;
+                let r = rh.predict(db)?;
                 if l < r {
-                    l
+                    Ok(l)
                 } else {
-                    r
+                    Ok(r)
                 }
             }
-            Bag::Union(lh, rh) => lh.predict() + rh.predict(),
+            Bag::Union(lh, rh) => Ok(lh.predict(db)? + rh.predict(db)?),
             Bag::Bag(bags) => {
                 let mut s = 0.0;
                 for bag in bags {
-                    s += bag.predict();
+                    s += bag.predict(db)?;
                 }
-                s
+                Ok(s)
             }
-            Bag::Inside(shape) => shape.predict(),
-            Bag::Outside(shape) => space::max_volume(shape.space()) - shape.predict(),
+            Bag::Inside(shape) => shape.predict(db),
+            Bag::Outside(shape) => Ok(db.space(shape.space())?.volume() - shape.predict(db)?),
         }
     }
 }
 
 impl Predictor for Shape {
-    fn predict(&self) -> f64 {
-        self.volume()
+    fn predict(&self, _db: &DataBase) -> Result<f64, String> {
+        Ok(self.volume())
     }
 }

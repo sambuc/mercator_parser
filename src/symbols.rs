@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 
-use super::database::space;
+use mercator_db::space;
+use mercator_db::SpaceObject;
+
 pub use super::types::*;
 
 /**********************************************************************/
@@ -63,6 +65,8 @@ pub enum Bag {
     Bag(Vec<Bag>),
     Inside(Shape),
     Outside(Shape),
+    //FIXME: ADD A SHAPE VARIANT WHICH JUST RETURNS ALL THE POSITIONS OF THAT SHAPE
+    //Shape(Shape),
 }
 
 impl Bag {
@@ -84,7 +88,7 @@ impl Bag {
             Bag::Bag(_) => {
                 // Bags can be defined in different spaces, thus the output is
                 // always in the universe space.
-                space::name()
+                space::Space::universe().name()
             }
             Bag::Inside(shape) => shape.space(),
             Bag::Outside(shape) => shape.space(),
@@ -163,12 +167,12 @@ impl Shape {
 
                 volume
             }
-            Shape::HyperSphere(_space, pos, r) => {
+            Shape::HyperSphere(_space, pos, radius) => {
                 // Formula from https://en.wikipedia.org/wiki/N-sphere#/media/File:N_SpheresVolumeAndSurfaceArea.png
-                let LiteralPosition(p) = pos;
-                let k = p.len(); // Number of dimensions.
+                let LiteralPosition(position) = pos;
+                let k = position.len(); // Number of dimensions.
 
-                let r = match *r {
+                let radius = match *radius {
                     LiteralNumber::Int(x) => x as f64,
                     LiteralNumber::Float(x) => x,
                 };
@@ -178,12 +182,12 @@ impl Shape {
 
                 // Set starting values for the coefficient
                 let mut a = 2.0;
-                let mut i = 1;
-
-                if (k % 2) == 0 {
+                let mut i = if (k % 2) == 0 {
                     a = pi;
-                    i = 2;
-                }
+                    2
+                } else {
+                    1
+                };
 
                 while i < k {
                     i += 2;
@@ -191,7 +195,7 @@ impl Shape {
                     a /= i as f64;
                 }
 
-                a * r.powi(i as i32)
+                a * radius.powi(i as i32)
             }
             Shape::Nifti(_) => unimplemented!(),
         }
@@ -203,10 +207,26 @@ impl Shape {
 /**********************************************************************/
 #[derive(Clone, Debug)]
 pub enum Position {
-    StrCmpICase(LiteralSelector, String),
     StrCmp(LiteralSelector, String),
     Selector(LiteralSelector),
     Literal(LiteralPosition),
+}
+
+impl Position {
+    pub fn value(&self, object: &SpaceObject) -> LiteralPosition {
+        match self {
+            Position::Literal(literal) => literal.clone(),
+            Position::Selector(selector) => selector.position(object),
+            Position::StrCmp(selector, literal) => {
+                let x = match (selector.str(object)).cmp(literal) {
+                    Ordering::Equal => 0,
+                    Ordering::Greater => 1,
+                    Ordering::Less => -1,
+                };
+                LiteralPosition(vec![LiteralNumber::Int(x)])
+            }
+        }
+    }
 }
 
 /**********************************************************************/
@@ -220,6 +240,17 @@ pub struct Field(pub String, pub Option<usize>);
 pub enum LiteralNumber {
     Int(i64),
     Float(f64),
+}
+
+impl From<&LiteralNumber> for Vec<f64> {
+    fn from(l: &LiteralNumber) -> Self {
+        let r = match l {
+            LiteralNumber::Int(x) => (*x) as f64,
+            LiteralNumber::Float(x) => *x,
+        };
+
+        vec![r]
+    }
 }
 
 impl PartialEq for LiteralNumber {
@@ -270,6 +301,36 @@ impl LiteralPosition {
 
         a
     }
+
+    pub fn dimensions(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl From<&LiteralNumber> for f64 {
+    fn from(l: &LiteralNumber) -> Self {
+        match l {
+            LiteralNumber::Int(x) => (*x) as f64,
+            LiteralNumber::Float(x) => *x,
+        }
+    }
+}
+
+impl From<&LiteralPosition> for Vec<f64> {
+    fn from(l: &LiteralPosition) -> Self {
+        let LiteralPosition(v) = l;
+        let mut r = Vec::with_capacity(v.len());
+
+        for x in v {
+            let x = match x {
+                LiteralNumber::Int(x) => (*x) as f64,
+                LiteralNumber::Float(x) => *x,
+            };
+            r.push(x);
+        }
+
+        r
+    }
 }
 
 impl PartialOrd for LiteralPosition {
@@ -316,4 +377,69 @@ impl LiteralSelector {
         // FIXME: Pretend for now that everything is a number, needs to be actually looked up in data model.
         LiteralTypes::Int
     }
+
+    // FIXME: THIS IS SOOO WRONG
+    pub fn position(&self, object: &SpaceObject) -> LiteralPosition {
+        println!("LiteralSelector.position(): {:?}", self);
+        let v: Vec<f64> = object.position.clone().into();
+
+        LiteralPosition(v.into_iter().map(LiteralNumber::Float).collect::<Vec<_>>())
+    }
+
+    // FIXME: THIS IS SOOO WRONG
+    pub fn str(&self, object: &SpaceObject) -> String {
+        let LiteralSelector(v) = self;
+        let last = v.last();
+        if let Some(Field(name, _)) = last {
+            if name == "id" {
+                return object.value.id().clone();
+            } else if name == "type" {
+                return object.value.type_name();
+            } else if name == "reference_space" {
+                return object.space_id.clone();
+            }
+        }
+
+        println!("LiteralSelector.str(): {:?}", self);
+        unimplemented!();
+    }
+}
+
+// The logic was getting a bit too complex to be embedded directly into the
+// grammar definition.
+pub fn get_filter(p: Predicate, b: Option<Bag>) -> Bag {
+    match b {
+        Some(b) => Bag::Filter(Some(p), Box::new(b)),
+        None => {
+            let (low, high) = space::Space::universe().bounding_box();
+            let low: Vec<_> = low.into();
+            let high: Vec<_> = high.into();
+            let bb = Shape::HyperRectangle(
+                space::Space::universe().name().clone(),
+                vec![
+                    LiteralPosition(
+                        low.into_iter()
+                            .map(LiteralNumber::Float)
+                            .collect::<Vec<_>>(),
+                    ),
+                    LiteralPosition(
+                        high.into_iter()
+                            .map(LiteralNumber::Float)
+                            .collect::<Vec<_>>(),
+                    ),
+                ],
+            );
+
+            Bag::Filter(Some(p), Box::new(Bag::Inside(bb)))
+        }
+    }
+}
+
+//FIXME: HACK FOR NOW; NEED PROPER TYPE CHECKING!
+pub fn get_type() -> LiteralTypes {
+    LiteralTypes::Vector(vec![
+        LiteralTypes::Float,
+        LiteralTypes::Float,
+        LiteralTypes::Float,
+    ])
 }

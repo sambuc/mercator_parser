@@ -19,9 +19,6 @@ bag_expression
     // Spatial Operators
     | inside
     | outside
-    // When used directly here, the inside() operation on the shape is
-    // implied.
-    | shapes
     ;
 
 /**********************************************************************/
@@ -58,7 +55,6 @@ predicate
     | greater
     | equal
     | str_cmp
-    | str_cmp_icase
     | not
     | and
     | or

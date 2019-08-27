@@ -1,5 +1,4 @@
-use super::database::space;
-use super::expression::Validator;
+use super::expressions::Validator;
 use super::symbols::*;
 
 pub type ValidationResult = Result<LiteralTypes, String>;
@@ -24,7 +23,7 @@ impl Validator for Bag {
     type ValidationResult = self::ValidationResult;
 
     fn validate(&self) -> ValidationResult {
-        fn compare_bag_types(lh: &Box<Bag>, rh: &Box<Bag>) -> ValidationResult {
+        fn compare_bag_types(lh: &Bag, rh: &Bag) -> ValidationResult {
             if lh.space().cmp(rh.space()) != std::cmp::Ordering::Equal {
                 return Err(format!(
                     "left and right sets are defined in different reference spaces: '{}' vs '{}'.",
@@ -68,7 +67,7 @@ impl Validator for Bag {
                     }
                 }
 
-                Ok(space::get_type(space::name()).clone())
+                Ok(get_type())
             }
             Bag::Inside(shape) => shape.validate(),
             Bag::Outside(shape) => shape.validate(),

@@ -1,12 +1,16 @@
 #[macro_use]
 extern crate measure_time;
 
-extern crate parser;
-
-use parser::QueryParser;
-use parser::{Executor, Predictor, Validator};
-
 use std::io;
+use std::process::exit;
+
+use mercator_db::json::storage;
+use mercator_db::DataBase;
+use parser::Executor;
+use parser::FiltersParser;
+use parser::Predictor;
+use parser::QueryParser;
+use parser::Validator;
 
 fn main() {
     // If RUST_LOG is unset, set it to INFO, otherwise keep it as-is.
@@ -15,8 +19,41 @@ fn main() {
     }
     pretty_env_logger::init();
 
-    //let parser = queries::FiltersParser::new();
+    let import;
+
+    if std::env::var("MERCATOR_IMPORT_DATA").is_err() {
+        std::env::set_var("MERCATOR_IMPORT_DATA", "test");
+    }
+
+    match std::env::var("MERCATOR_IMPORT_DATA") {
+        Ok(val) => import = val,
+        Err(val) => {
+            error!("Could not fetch {} : `{}`", "MERCATOR_IMPORT_DATA", val);
+            exit(1);
+        }
+    };
+
+    // Convert to binary the JSON data:
+    if true {
+        info_time!("Converting to binary JSON data");
+        storage::convert(&import);
+    }
+
+    // Build a Database Index:
+    if true {
+        info_time!("Building database index");
+        storage::build(&import);
+    }
+
+    // Load a Database:
+    let db;
+    {
+        info_time!("Loading database index");
+        db = DataBase::load(import).unwrap();
+    }
+
     let parser = QueryParser::new();
+    let parser = FiltersParser::new();
 
     loop {
         println!();
@@ -27,49 +64,59 @@ fn main() {
             Ok(0) => break,    // Catch ^D
             Ok(1) => continue, // Catch \n
             Err(_) => continue,
-            Ok(_) => (),
-        }
+            Ok(_) => {
+                if input.trim().eq_ignore_ascii_case("quit") {
+                    break;
+                }
 
-        if input.trim().eq_ignore_ascii_case("quit") {
-            break;
-        }
+                info_time!("Interpretation");
+                let mut parse;
+                {
+                    info_time!("Parsing");
+                    parse = parser.parse(&input);
+                }
 
-        let input = input.as_str();
-        {
-            debug_time!("Interpretation");
-            let mut parse;
-            {
-                trace_time!("Parsing");
-                parse = parser.parse(input);
-            }
-            trace!("Tree: \n{:?}", parse);
+                if let Err(e) = &parse {
+                    warn!("Parsing failed: \n{:?}", e);
+                } else {
+                    trace!("Tree: \n{:?}", parse);
+                }
 
-            match parse {
-                Ok(Some(t)) => {
+                // QueryParser
+                //if let Ok(Some(t)) = parse {
+
+                // FiltersParser
+                if let Ok(t) = parse {
                     let validate;
                     {
-                        trace_time!("Type check");
+                        info_time!("Type check");
                         validate = t.validate();
                     }
                     info!("Type: \n{:?}", validate);
 
-                    if let Ok(_) = validate {
+                    if validate.is_ok() {
                         let predict;
                         {
-                            trace_time!("Prediction");
-                            predict = t.predict();
+                            info_time!("Prediction");
+                            predict = t.predict(&db);
                         }
                         info!("Predict: \n{:?}", predict);
 
                         let execute;
                         {
-                            trace_time!("Exectution");
-                            execute = t.execute();
+                            info_time!("Execution");
+                            execute = t.execute(&db, "test", None, None);
                         }
-                        info!("Execution: \n{:?}", execute);
+
+                        if let Ok(r) = execute {
+                            //let r = model::to_spatial_objects(&db, r);
+                            info!("Execution: \n{:#?}", r);
+                            info!("NB results: {:?}", r.len());
+                        } else {
+                            info!("Execution: \n{:?}", execute);
+                        }
                     }
                 }
-                _ => (),
             }
         }
     }

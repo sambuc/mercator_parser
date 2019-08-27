@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
+use mercator_db::space::Space;
+
 use crate::symbols;
-use crate::database::space;
 
 grammar;
 
@@ -27,7 +28,7 @@ NiftiOperator: symbols::Projection = {
     ")" => {
         let space_id = match rs {
             Some(id) => id,
-            None => space::name().clone(),
+            None => Space::universe().name().clone(),
         };
 
         if let Some((sel, _)) = s {
@@ -47,7 +48,7 @@ JsonOperator: symbols::Projection = {
     ")" => {
         let space_id = match rs {
             Some(id) => id,
-            None => space::name().clone(),
+            None => Space::universe().name().clone(),
         };
 
         symbols::Projection::JSON(space_id, f, b)
@@ -148,9 +149,6 @@ Bags: symbols::Bag = {
     // Spatial Operators
     Inside,
     Outside,
-    // When used directly here, the inside() operation on the shape is
-    // implied.
-    Shapes => symbols::Bag::Inside(<>)
 };
 
 //*********************************************************************/
@@ -186,26 +184,8 @@ Filter: symbols::Bag = {
 //     "filter" "(" <p:Predicates> "," <b:Bags> ")" =>
     "filter" "(" <b:Bags> ")" =>
         symbols::Bag::Filter(None, Box::new(b)),
-    "filter" "(" <p:Predicates> <b:("," <Bags> )?> ")" => match b {
-        Some(b) => symbols::Bag::Filter(Some(p), Box::new(b)),
-        None => {
-            let v = space::bounding_box(space::name());
-            let mut positions = Vec::new();
-            for point in v {
-                let mut position = Vec::new();
-                for c in point {
-                    position.push(symbols::LiteralNumber::Int(*c))
-                }
-                positions.push(symbols::LiteralPosition(position));
-            }
-            let bb = symbols::Shape::HyperRectangle(
-                space::name().clone(),
-                positions
-            );
-
-            symbols::Bag::Filter(Some(p), Box::new(symbols::Bag::Inside(bb)))
-        }
-    }
+    "filter" "(" <p:Predicates> <b:("," <Bags> )?> ")" =>
+        symbols::get_filter(p, b)
 };
 
 Predicates: symbols::Predicate = {
@@ -311,7 +291,7 @@ HyperRectangle: symbols::Shape = {
     "}" => {
         let space_id = match rs {
             Some(id) => id,
-            None => space::name().clone(),
+            None => Space::universe().name().clone(),
         };
         let mut pos = vec![l, h];
         for (_, lh, _, rh) in list.iter() {
@@ -331,7 +311,7 @@ HyperSphere: symbols::Shape = {
     "}" => {
         let space_id = match rs {
             Some(id) => id,
-            None => space::name().clone(),
+            None => Space::universe().name().clone(),
         };
 
         symbols::Shape::HyperSphere(space_id, c, r)
@@ -342,7 +322,7 @@ Point: symbols::Shape = {
     "point" "{" <pos:Position> <rs:( "," <String> )?> "}" => {
          let space_id = match rs {
             Some(id) => id,
-            None => space::name().clone(),
+            None => Space::universe().name().clone(),
         };
 
         symbols::Shape::Point(space_id, pos)
@@ -365,7 +345,7 @@ Nifti: symbols::Shape = {
     "}" => {
         let space_id = match rs {
             Some(id) => id,
-            None => space::name().clone(),
+            None => Space::universe().name().clone(),
         };
         symbols::Shape::Nifti(space_id)
     }
@@ -383,7 +363,6 @@ ByteProvider = { "uri" "(" String ")" };
 // Always returns a vector of numbers, a.k.a a position (a scalar will
 // be represented as a vector of one element)
 Positions: symbols::Position = {
-    StrCmpICase,
     StrCmp,
     Selector => symbols::Position::Selector(<>),
     Position => symbols::Position::Literal(<>)
@@ -396,13 +375,6 @@ Positions: symbols::Position = {
 StrCmp: symbols::Position = {
     "str_cmp" "(" <s:Selector> "," <v:String> ")" => {
         symbols::Position::StrCmp(s, v)
-    }
-};
-
-// Same, but case insensitive.
-StrCmpICase: symbols::Position = {
-    "str_cmp_ignore_case" "(" <s:Selector> "," <v:String> ")" => {
-        symbols::Position::StrCmpICase(s, v)
     }
 };
 

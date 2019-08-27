@@ -1,8 +1,23 @@
 [package]
-name = "parser"
+name = "mercator_parser"
 version = "0.1.0"
-authors = ["Lionel Sambuc <lionel.sambuc@gmail.com>"]
+authors = ["EPFL-DIAS", "Lionel Sambuc <lionel.sambuc@epfl.ch>"]
+
 edition = "2018"
+
+description = "Query Parser for Mercator's own DSL."
+#homepage = "https://crates.io/crates/mercator_parser"
+repository = "https://github.com/epfl-dias/mercator_parser"
+readme = "README.md"
+
+keywords = []
+categories = ["database-implementations", "parser-implementations"]
+
+license = "MIT"
+#license-file = "LICENSE"
+
+include = ["Cargo.toml", "README.md", "LICENSE", "ACKNOWLEDGEMENTS", "src/**/*.rs"]
+
 build = "build.rs" # LALRPOP preprocessing
 
 [lib]
@@ -14,15 +29,18 @@ name = "parser-driver"
 path = "src/main.rs"
 
 [dependencies]
-lalrpop-util = "0.17.0"
-regex = "0.2.1"
-measure_time = "0.6" # To mesure parsing time, only required by binary
-lazy_static = "1.3.0" # for space.rs, might be removed once the full data model is provided by the use of the crate
+mercator_db = "^0.1"
+
+lalrpop-util = "^0.17"
+regex = "^1.2"
+
+measure_time = "^0.6" # To mesure parsing time, only required by binary
 
 # Logging macros API
-log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
-pretty_env_logger = "0.3"       # Logger implementation
+log = { version = "^0.4", features = ["max_level_trace", "release_max_level_info"] }
+#log = { version = "^0.4", features = ["max_level_trace", "release_max_level_trace"] }
+pretty_env_logger = "^0.3"       # Logger implementation
 
 [build-dependencies]
-lalrpop = "0.17.0"
+lalrpop = "^0.17.1"
 
