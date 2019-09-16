@@ -37,8 +37,8 @@ regex = "^1.2"
 measure_time = "^0.6" # To mesure parsing time, only required by binary
 
 # Logging macros API
-log = { version = "^0.4", features = ["max_level_trace", "release_max_level_info"] }
-#log = { version = "^0.4", features = ["max_level_trace", "release_max_level_trace"] }
+#log = { version = "^0.4", features = ["max_level_trace", "release_max_level_info"] }
+log = { version = "^0.4", features = ["max_level_trace", "release_max_level_trace"] }
 pretty_env_logger = "^0.3"       # Logger implementation
 
 [build-dependencies]
