@@ -5,6 +5,7 @@ use std::io;
 use std::process::exit;
 
 use mercator_db::json::storage;
+use mercator_db::CoreQueryParameters;
 use mercator_db::DataBase;
 use parser::Executor;
 use parser::FiltersParser;
@@ -52,6 +53,12 @@ fn main() {
         db = DataBase::load(import).unwrap();
     }
 
+    let parameters = CoreQueryParameters {
+        db: &db,
+        output_space: None,
+        threshold_volume: None,
+        resolution: None,
+    };
     let parser = QueryParser::new();
     let parser = FiltersParser::new();
 
@@ -105,7 +112,7 @@ fn main() {
                         let execute;
                         {
                             info_time!("Execution");
-                            execute = t.execute(&db, "test", None, None);
+                            execute = t.execute("test", &parameters);
                         }
 
                         if let Ok(r) = execute {

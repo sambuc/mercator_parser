@@ -1,3 +1,4 @@
+use mercator_db::CoreQueryParameters;
 use mercator_db::DataBase;
 use mercator_db::SpaceObject;
 
@@ -14,13 +15,7 @@ pub trait Predictor {
 pub trait Executor {
     type ResultSet;
 
-    fn execute(
-        &self,
-        db: &DataBase,
-        core_id: &str,
-        output_space: Option<&str>,
-        threshold_volume: Option<f64>,
-    ) -> Self::ResultSet;
+    fn execute(&self, core_id: &str, parameters: &CoreQueryParameters) -> Self::ResultSet;
 }
 
 pub trait Evaluator {

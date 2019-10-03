@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use mercator_db::space;
 use mercator_db::Core;
-use mercator_db::DataBase;
+use mercator_db::CoreQueryParameters;
 use mercator_db::SpaceObject;
 
 use super::expressions::*;
@@ -25,21 +25,13 @@ impl From<&LiteralNumber> for space::Coordinate {
 }
 
 fn complement_helper(
-    db: &DataBase,
     core: &Core,
+    parameters: &CoreQueryParameters,
     space_id: &str,
     inside: Vec<SpaceObject>,
-    output_space: Option<&str>,
-    threshold: f64,
 ) -> mercator_db::ResultSet {
-    let (low, high) = db.space(space_id)?.bounding_box();
-    match core.get_by_shape(
-        db,
-        &space::Shape::BoundingBox(low, high),
-        space_id,
-        output_space,
-        threshold,
-    ) {
+    let (low, high) = parameters.db.space(space_id)?.bounding_box();
+    match core.get_by_shape(parameters, &space::Shape::BoundingBox(low, high), space_id) {
         e @ Err(_) => e,
         Ok(points) => Ok(points
             .into_iter()
@@ -48,14 +40,8 @@ fn complement_helper(
     }
 }
 
-fn distinct(
-    db: &DataBase,
-    core_id: &str,
-    bag: &Bag,
-    output_space: Option<&str>,
-    threshold_volume: Option<f64>,
-) -> mercator_db::ResultSet {
-    match bag.execute(db, core_id, output_space, threshold_volume) {
+fn distinct(core_id: &str, parameters: &CoreQueryParameters, bag: &Bag) -> mercator_db::ResultSet {
+    match bag.execute(core_id, parameters) {
         e @ Err(_) => e,
         Ok(mut v) => {
             let set: HashSet<_> = v.drain(..).collect(); // dedup
@@ -67,16 +53,14 @@ fn distinct(
 }
 
 fn filter(
-    db: &DataBase,
     core_id: &str,
+    parameters: &CoreQueryParameters,
     predicate: &Option<Predicate>,
     bag: &Bag,
-    output_space: Option<&str>,
-    threshold_volume: Option<f64>,
 ) -> mercator_db::ResultSet {
     match predicate {
-        None => bag.execute(db, core_id, output_space, threshold_volume),
-        Some(predicate) => match bag.execute(db, core_id, output_space, threshold_volume) {
+        None => bag.execute(core_id, parameters),
+        Some(predicate) => match bag.execute(core_id, parameters) {
             e @ Err(_) => e,
             Ok(results) => Ok(results
                 .into_iter()
@@ -87,43 +71,36 @@ fn filter(
 }
 
 fn complement(
-    db: &DataBase,
     core_id: &str,
+    parameters: &CoreQueryParameters,
     core: &Core,
     bag: &Bag,
-    output_space: Option<&str>,
-    threshold: f64,
-    threshold_volume: Option<f64>,
 ) -> mercator_db::ResultSet {
-    match bag.execute(db, core_id, output_space, threshold_volume) {
+    match bag.execute(core_id, parameters) {
         // FIXME: The complement of a set is computed within its definition space.
         e @ Err(_) => e,
         Ok(inside) => complement_helper(
-            db,
             core,
+            parameters,
             mercator_db::space::Space::universe().name(),
             inside,
-            output_space,
-            threshold,
         ),
     }
 }
 
 fn intersection(
-    db: &DataBase,
     core_id: &str,
+    parameters: &CoreQueryParameters,
     rh: &Bag,
     lh: &Bag,
-    output_space: Option<&str>,
-    threshold_volume: Option<f64>,
 ) -> mercator_db::ResultSet {
-    let l = lh.execute(db, core_id, output_space, threshold_volume);
+    let l = lh.execute(core_id, parameters);
     if let Ok(l) = l {
-        let r = rh.execute(db, core_id, output_space, threshold_volume);
+        let r = rh.execute(core_id, parameters);
         if let Ok(r) = r {
             let mut v = vec![];
 
-            if rh.predict(db) < lh.predict(db) {
+            if rh.predict(parameters.db) < lh.predict(parameters.db) {
                 for o in r {
                     if l.contains(&o) {
                         v.push(o);
@@ -146,18 +123,16 @@ fn intersection(
 }
 
 fn union(
-    db: &DataBase,
     core_id: &str,
+    parameters: &CoreQueryParameters,
     rh: &Bag,
     lh: &Bag,
-    output_space: Option<&str>,
-    threshold_volume: Option<f64>,
 ) -> mercator_db::ResultSet {
-    let l = lh.execute(db, core_id, output_space, threshold_volume);
+    let l = lh.execute(core_id, parameters);
     if let Ok(mut l) = l {
-        let r = rh.execute(db, core_id, output_space, threshold_volume);
+        let r = rh.execute(core_id, parameters);
         if let Ok(mut r) = r {
-            if rh.predict(db) < lh.predict(db) {
+            if rh.predict(parameters.db) < lh.predict(parameters.db) {
                 l.append(&mut r);
                 Ok(l)
             } else {
@@ -172,16 +147,10 @@ fn union(
     }
 }
 
-fn bag(
-    db: &DataBase,
-    core_id: &str,
-    bags: &[Bag],
-    output_space: Option<&str>,
-    threshold_volume: Option<f64>,
-) -> mercator_db::ResultSet {
+fn bag(core_id: &str, parameters: &CoreQueryParameters, bags: &[Bag]) -> mercator_db::ResultSet {
     let mut v = vec![];
     for bag in bags {
-        let b = bag.execute(db, core_id, output_space, threshold_volume);
+        let b = bag.execute(core_id, parameters);
         match b {
             e @ Err(_) => {
                 return e;
@@ -195,14 +164,9 @@ fn bag(
     Ok(v)
 }
 
-fn inside(
-    db: &DataBase,
-    core: &Core,
-    shape: &Shape,
-    output_space: Option<&str>,
-    threshold: f64,
-) -> mercator_db::ResultSet {
-    let parameters = match shape {
+fn inside(parameters: &CoreQueryParameters, core: &Core, shape: &Shape) -> mercator_db::ResultSet {
+    let db = parameters.db;
+    let param = match shape {
         Shape::Point(space_id, position) => {
             let space = db.space(space_id)?;
             let position: Vec<f64> = position.into();
@@ -238,27 +202,19 @@ fn inside(
         Shape::Nifti(_space_id) => Err("Inside-Nifti: not yet implemented".to_string()),
     };
 
-    match parameters {
-        Ok((space_id, shape)) => core.get_by_shape(db, &shape, space_id, output_space, threshold),
+    match param {
+        Ok((space_id, shape)) => core.get_by_shape(parameters, &shape, space_id),
         Err(e) => Err(e),
     }
 }
 
-fn outside(
-    db: &DataBase,
-    core: &Core,
-    shape: &Shape,
-    output_space: Option<&str>,
-    threshold: f64,
-) -> mercator_db::ResultSet {
+fn outside(parameters: &CoreQueryParameters, core: &Core, shape: &Shape) -> mercator_db::ResultSet {
     match shape {
         Shape::Point(space_id, position) => {
             let position: Vec<f64> = position.into();
-            match core.get_by_positions(db, &[position.into()], space_id, output_space, threshold) {
+            match core.get_by_positions(parameters, &[position.into()], space_id) {
                 e @ Err(_) => e,
-                Ok(inside) => {
-                    complement_helper(db, core, space_id, inside, output_space, threshold)
-                }
+                Ok(inside) => complement_helper(core, parameters, space_id, inside),
             }
         }
         Shape::HyperRectangle(space_id, bounding_box) => {
@@ -281,17 +237,9 @@ fn outside(
             let mut high: space::Position = (&bounding_box[1]).into();
             high -= increment.into();
 
-            match core.get_by_shape(
-                db,
-                &space::Shape::BoundingBox(low, high),
-                space_id,
-                output_space,
-                threshold,
-            ) {
+            match core.get_by_shape(parameters, &space::Shape::BoundingBox(low, high), space_id) {
                 e @ Err(_) => e,
-                Ok(inside) => {
-                    complement_helper(db, core, space_id, inside, output_space, threshold)
-                }
+                Ok(inside) => complement_helper(core, parameters, space_id, inside),
             }
         }
         Shape::HyperSphere(space_id, center, radius) => {
@@ -301,16 +249,12 @@ fn outside(
             let center: space::Position = center.into();
 
             match core.get_by_shape(
-                db,
+                parameters,
                 &space::Shape::HyperSphere(center, radius.into()),
                 space_id,
-                output_space,
-                threshold,
             ) {
                 e @ Err(_) => e,
-                Ok(inside) => {
-                    complement_helper(db, core, space_id, inside, output_space, threshold)
-                }
+                Ok(inside) => complement_helper(core, parameters, space_id, inside),
             }
         }
         Shape::Nifti(_space_id) => Err("Outside-nifti: not yet implemented".to_string()),
@@ -320,17 +264,11 @@ fn outside(
 impl Executor for Projection {
     type ResultSet = mercator_db::ResultSet;
 
-    fn execute(
-        &self,
-        db: &DataBase,
-        core_id: &str,
-        output_space: Option<&str>,
-        threshold_volume: Option<f64>,
-    ) -> Self::ResultSet {
+    fn execute(&self, core_id: &str, parameters: &CoreQueryParameters) -> Self::ResultSet {
         match self {
             Projection::Nifti(_, _, _bag) => Err("Proj-Nifti: not yet implemented".to_string()),
             Projection::JSON(_, _format, bag) => {
-                bag.execute(db, core_id, output_space, threshold_volume)
+                bag.execute(core_id, parameters)
                 // FIXME: Add projections here
             }
         }
@@ -340,44 +278,22 @@ impl Executor for Projection {
 impl Executor for Bag {
     type ResultSet = mercator_db::ResultSet;
 
-    fn execute(
-        &self,
-        db: &DataBase,
-        core_id: &str,
-        output_space: Option<&str>,
-        threshold_volume: Option<f64>,
-    ) -> Self::ResultSet {
-        let threshold = match threshold_volume {
-            None => 0.0,
-            Some(v) => v,
-        };
-        let core = db.core(core_id)?;
+    fn execute(&self, core_id: &str, parameters: &CoreQueryParameters) -> Self::ResultSet {
+        let core = parameters.db.core(core_id)?;
 
         match self {
-            Bag::Distinct(bag) => distinct(db, core_id, bag, output_space, threshold_volume),
-            Bag::Filter(predicate, bag) => {
-                filter(db, core_id, predicate, bag, output_space, threshold_volume)
-            }
-            Bag::Complement(bag) => complement(
-                db,
-                core_id,
-                core,
-                bag,
-                output_space,
-                threshold,
-                threshold_volume,
-            ),
-            Bag::Intersection(lh, rh) => {
-                intersection(db, core_id, rh, lh, output_space, threshold_volume)
-            }
-            Bag::Union(lh, rh) => union(db, core_id, rh, lh, output_space, threshold_volume),
-            Bag::Bag(list) => bag(db, core_id, list, output_space, threshold_volume),
-            Bag::Inside(shape) => inside(db, core, shape, output_space, threshold),
+            Bag::Distinct(bag) => distinct(core_id, parameters, bag),
+            Bag::Filter(predicate, bag) => filter(core_id, parameters, predicate, bag),
+            Bag::Complement(bag) => complement(core_id, parameters, core, bag),
+            Bag::Intersection(lh, rh) => intersection(core_id, parameters, rh, lh),
+            Bag::Union(lh, rh) => union(core_id, parameters, rh, lh),
+            Bag::Bag(list) => bag(core_id, parameters, list),
+            Bag::Inside(shape) => inside(parameters, core, shape),
             Bag::Outside(shape) => {
                 //FIXME: This is currently computed as the complement of the values within the shape, except its surface.
                 //       Should this be instead a list of positions within the shape?
                 //FIXME: Should we use the Shape's Space to get the maximum bounds or the output Space requested?
-                outside(db, core, shape, output_space, threshold)
+                outside(parameters, core, shape)
             }
         }
     }
