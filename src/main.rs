@@ -2,9 +2,7 @@
 extern crate measure_time;
 
 use std::io;
-use std::process::exit;
 
-use mercator_db::json::storage;
 use mercator_db::CoreQueryParameters;
 use mercator_db::DataBase;
 use parser::Executor;
@@ -20,37 +18,13 @@ fn main() {
     }
     pretty_env_logger::init();
 
-    let import;
-
-    if std::env::var("MERCATOR_IMPORT_DATA").is_err() {
-        std::env::set_var("MERCATOR_IMPORT_DATA", "test");
-    }
-
-    match std::env::var("MERCATOR_IMPORT_DATA") {
-        Ok(val) => import = val,
-        Err(val) => {
-            error!("Could not fetch {} : `{}`", "MERCATOR_IMPORT_DATA", val);
-            exit(1);
-        }
-    };
-
-    // Convert to binary the JSON data:
-    if true {
-        info_time!("Converting to binary JSON data");
-        storage::convert(&import);
-    }
-
-    // Build a Database Index:
-    if true {
-        info_time!("Building database index");
-        storage::build(&import);
-    }
+    let core = "10k";
 
     // Load a Database:
     let db;
     {
         info_time!("Loading database index");
-        db = DataBase::load(import).unwrap();
+        db = DataBase::load(&[&format!("{}.index", core)]).unwrap();
     }
 
     let parameters = CoreQueryParameters {
@@ -112,7 +86,7 @@ fn main() {
                         let execute;
                         {
                             info_time!("Execution");
-                            execute = t.execute("test", &parameters);
+                            execute = t.execute(core, &parameters);
                         }
 
                         if let Ok(r) = execute {
