@@ -392,9 +392,9 @@ impl LiteralSelector {
         let last = v.last();
         if let Some(Field(name, _)) = last {
             if name == "id" {
-                return object.value.id().clone();
+                return object.value.id().into();
             } else if name == "type" {
-                return object.value.type_name();
+                return object.value.type_name().into();
             } else if name == "reference_space" {
                 return object.space_id.clone();
             }
