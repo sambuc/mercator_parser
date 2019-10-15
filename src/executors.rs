@@ -40,6 +40,18 @@ fn complement_helper(
     }
 }
 
+fn view_port(core_id: &str, parameters: &CoreQueryParameters, bag: &Bag) -> mercator_db::ResultSet {
+    if let Some((low, high)) = parameters.view_port {
+        let vp = Bag::Inside(Shape::HyperRectangle(
+            bag.space().clone(),
+            vec![low.into(), high.into()],
+        ));
+        intersection(core_id, parameters, &vp, bag)
+    } else {
+        bag.execute(core_id, parameters)
+    }
+}
+
 fn distinct(core_id: &str, parameters: &CoreQueryParameters, bag: &Bag) -> mercator_db::ResultSet {
     match bag.execute(core_id, parameters) {
         e @ Err(_) => e,
@@ -282,6 +294,7 @@ impl Executor for Bag {
         let core = parameters.db.core(core_id)?;
 
         match self {
+            Bag::ViewPort(bag) => view_port(core_id, parameters, bag),
             Bag::Distinct(bag) => distinct(core_id, parameters, bag),
             Bag::Filter(predicate, bag) => filter(core_id, parameters, predicate, bag),
             Bag::Complement(bag) => complement(core_id, parameters, core, bag),

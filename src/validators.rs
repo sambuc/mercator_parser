@@ -54,6 +54,7 @@ impl Validator for Bag {
         }
 
         match self {
+            Bag::ViewPort(bag) => bag.validate(),
             Bag::Distinct(bag) => bag.validate(),
             Bag::Filter(_, bag) => bag.validate(),
             Bag::Complement(bag) => bag.validate(),

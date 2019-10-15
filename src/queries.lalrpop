@@ -135,7 +135,10 @@ Aggregations: symbols::Aggregation = {
 //*********************************************************************/
 // SELECTING / FILTERING DATA                                         */
 //*********************************************************************/
-pub Filters = { Bags };
+pub Filters: symbols::Bag = {
+    <Bags> =>
+        symbols::Bag::ViewPort(Box::new(<>))
+};
 
 // All these expressions generate bags.
 Bags: symbols::Bag = {

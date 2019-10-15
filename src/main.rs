@@ -31,6 +31,7 @@ fn main() {
         db: &db,
         output_space: None,
         threshold_volume: None,
+        view_port: &None,
         resolution: None,
     };
     let parser = QueryParser::new();
@@ -51,7 +52,7 @@ fn main() {
                 }
 
                 info_time!("Interpretation");
-                let mut parse;
+                let parse;
                 {
                     info_time!("Parsing");
                     parse = parser.parse(&input);

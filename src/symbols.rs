@@ -57,6 +57,9 @@ struct Transform {
 /**********************************************************************/
 #[derive(Clone, Debug)]
 pub enum Bag {
+    // This is an implicit operator, inserted by the parser. Never to be used directly.
+    ViewPort(Box<Bag>),
+    // Bags
     Distinct(Box<Bag>),
     Filter(Option<Predicate>, Box<Bag>),
     Complement(Box<Bag>),
@@ -72,6 +75,7 @@ pub enum Bag {
 impl Bag {
     pub fn space(&self) -> &String {
         match self {
+            Bag::ViewPort(bag) => bag.space(),
             Bag::Distinct(bag) => bag.space(),
             Bag::Filter(_, bag) => bag.space(),
             Bag::Complement(bag) => bag.space(),
@@ -330,6 +334,17 @@ impl From<&LiteralPosition> for Vec<f64> {
         }
 
         r
+    }
+}
+
+impl From<&Vec<f64>> for LiteralPosition {
+    fn from(v: &Vec<f64>) -> Self {
+        let mut lv = Vec::with_capacity(v.len());
+        for value in v {
+            lv.push(LiteralNumber::Float(*value));
+        }
+
+        LiteralPosition(lv)
     }
 }
 

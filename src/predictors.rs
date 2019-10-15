@@ -15,6 +15,7 @@ impl Predictor for Projection {
 impl Predictor for Bag {
     fn predict(&self, db: &DataBase) -> Result<f64, String> {
         match self {
+            Bag::ViewPort(bag) => bag.predict(db),
             Bag::Distinct(bag) => bag.predict(db),
             Bag::Filter(_, bag) => bag.predict(db),
             Bag::Complement(bag) => Ok(db.space(bag.space())?.volume() - bag.predict(db)?),
