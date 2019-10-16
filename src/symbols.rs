@@ -135,7 +135,7 @@ impl Shape {
 
     pub fn volume(&self) -> f64 {
         match self {
-            Shape::Point(_, _) => 1.0, // This is the smallest non-zero volume possible //TODO DOUBLE CHECK IT IS TRUE
+            Shape::Point(_, _) => std::f64::EPSILON, // The smallest non-zero volume possible
             Shape::HyperRectangle(_space, pos) => {
                 //TODO: At this time, only aligned to the axes, defined by two points, hyperrectangles are supported.
                 assert_eq!(pos.len(), 2);
