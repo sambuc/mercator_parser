@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use mercator_db::space;
-use mercator_db::SpaceObject;
+use mercator_db::Properties;
 
 pub use super::types::*;
 
@@ -217,7 +217,10 @@ pub enum Position {
 }
 
 impl Position {
-    pub fn value(&self, object: &SpaceObject) -> LiteralPosition {
+    pub fn value<'e>(
+        &self,
+        object: (&'e String, &'e space::Position, &'e Properties),
+    ) -> LiteralPosition {
         match self {
             Position::Literal(literal) => literal.clone(),
             Position::Selector(selector) => selector.position(object),
@@ -347,6 +350,12 @@ impl From<&Vec<f64>> for LiteralPosition {
         LiteralPosition(lv)
     }
 }
+impl From<&space::Position> for LiteralPosition {
+    fn from(position: &space::Position) -> Self {
+        let lv: Vec<f64> = position.into();
+        (&lv).into()
+    }
+}
 
 impl PartialOrd for LiteralPosition {
     fn partial_cmp(&self, other: &LiteralPosition) -> Option<Ordering> {
@@ -394,24 +403,25 @@ impl LiteralSelector {
     }
 
     // FIXME: THIS IS SOOO WRONG
-    pub fn position(&self, object: &SpaceObject) -> LiteralPosition {
+    pub fn position<'e>(
+        &self,
+        object: (&'e String, &'e space::Position, &'e Properties),
+    ) -> LiteralPosition {
         println!("LiteralSelector.position(): {:?}", self);
-        let v: Vec<f64> = object.position.clone().into();
-
-        LiteralPosition(v.into_iter().map(LiteralNumber::Float).collect::<Vec<_>>())
+        object.1.into()
     }
 
     // FIXME: THIS IS SOOO WRONG
-    pub fn str(&self, object: &SpaceObject) -> String {
+    pub fn str<'e>(&self, object: (&'e String, &'e space::Position, &'e Properties)) -> String {
         let LiteralSelector(v) = self;
         let last = v.last();
         if let Some(Field(name, _)) = last {
             if name == "id" {
-                return object.value.id().into();
+                return object.2.id().into();
             } else if name == "type" {
-                return object.value.type_name().into();
+                return object.2.type_name().into();
             } else if name == "reference_space" {
-                return object.space_id.clone();
+                return object.0.clone();
             }
         }
 

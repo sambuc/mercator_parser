@@ -1,6 +1,5 @@
 use mercator_db::CoreQueryParameters;
 use mercator_db::DataBase;
-use mercator_db::SpaceObject;
 
 pub trait Validator {
     type ValidationResult;
@@ -12,12 +11,18 @@ pub trait Predictor {
     fn predict(&self, db: &DataBase) -> Result<f64, String>;
 }
 
-pub trait Executor {
+pub trait Executor<'e> {
     type ResultSet;
 
-    fn execute(&self, core_id: &str, parameters: &CoreQueryParameters) -> Self::ResultSet;
+    fn execute<'f: 'e>(
+        &self,
+        core_id: &str,
+        parameters: &CoreQueryParameters<'f>,
+    ) -> Self::ResultSet;
 }
 
-pub trait Evaluator {
-    fn eval(&self, object: &SpaceObject) -> bool;
+pub trait Evaluator<'e> {
+    type Object;
+
+    fn eval(&self, object: Self::Object) -> bool;
 }

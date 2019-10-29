@@ -1,10 +1,13 @@
-use mercator_db::SpaceObject;
+use mercator_db::space;
+use mercator_db::Properties;
 
 use super::expressions::*;
 use super::symbols::*;
 
-impl Evaluator for Predicate {
-    fn eval(&self, object: &SpaceObject) -> bool {
+impl<'e> Evaluator<'e> for Predicate {
+    type Object = (&'e String, &'e space::Position, &'e Properties);
+
+    fn eval(&self, object: Self::Object) -> bool {
         match self {
             Predicate::Not(predicate) => !predicate.eval(object),
             Predicate::And(lh, rh) => lh.eval(object) && rh.eval(object),

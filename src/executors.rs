@@ -1,9 +1,9 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use mercator_db::space;
 use mercator_db::Core;
 use mercator_db::CoreQueryParameters;
-use mercator_db::SpaceObject;
+use mercator_db::Properties;
 
 use super::expressions::*;
 use super::symbols::*;
@@ -24,23 +24,36 @@ impl From<&LiteralNumber> for space::Coordinate {
     }
 }
 
-fn complement_helper(
-    core: &Core,
-    parameters: &CoreQueryParameters,
+fn complement_helper<'c>(
+    core: &'c Core,
+    parameters: &CoreQueryParameters<'c>,
     space_id: &str,
-    inside: Vec<SpaceObject>,
-) -> mercator_db::ResultSet {
+    inside: Vec<(&'c String, Vec<(space::Position, &'c Properties)>)>,
+) -> mercator_db::ResultSet<'c> {
     let (low, high) = parameters.db.space(space_id)?.bounding_box();
     match core.get_by_shape(parameters, &space::Shape::BoundingBox(low, high), space_id) {
         e @ Err(_) => e,
-        Ok(points) => Ok(points
-            .into_iter()
-            .filter(|o| !inside.contains(&o))
-            .collect::<Vec<_>>()),
+        Ok(points) => {
+            let hashmap = inside.into_iter().collect::<HashMap<_, _>>();
+
+            Ok(points
+                .into_iter()
+                .filter_map(|(space, v)| match hashmap.get(space) {
+                    None => None,
+                    Some(list) => {
+                        Some((space, v.into_iter().filter(|t| !list.contains(t)).collect()))
+                    }
+                })
+                .collect::<Vec<_>>())
+        }
     }
 }
 
-fn view_port(core_id: &str, parameters: &CoreQueryParameters, bag: &Bag) -> mercator_db::ResultSet {
+fn view_port<'c>(
+    core_id: &str,
+    parameters: &CoreQueryParameters<'c>,
+    bag: &Bag,
+) -> mercator_db::ResultSet<'c> {
     if let Some((low, high)) = parameters.view_port {
         let vp = Bag::Inside(Shape::HyperRectangle(
             bag.space().clone(),
@@ -52,7 +65,11 @@ fn view_port(core_id: &str, parameters: &CoreQueryParameters, bag: &Bag) -> merc
     }
 }
 
-fn distinct(core_id: &str, parameters: &CoreQueryParameters, bag: &Bag) -> mercator_db::ResultSet {
+fn distinct<'c>(
+    core_id: &str,
+    parameters: &CoreQueryParameters<'c>,
+    bag: &Bag,
+) -> mercator_db::ResultSet<'c> {
     match bag.execute(core_id, parameters) {
         e @ Err(_) => e,
         Ok(mut v) => {
@@ -64,30 +81,42 @@ fn distinct(core_id: &str, parameters: &CoreQueryParameters, bag: &Bag) -> merca
     }
 }
 
-fn filter(
+fn filter<'c>(
     core_id: &str,
-    parameters: &CoreQueryParameters,
+    parameters: &CoreQueryParameters<'c>,
     predicate: &Option<Predicate>,
     bag: &Bag,
-) -> mercator_db::ResultSet {
+) -> mercator_db::ResultSet<'c> {
     match predicate {
         None => bag.execute(core_id, parameters),
         Some(predicate) => match bag.execute(core_id, parameters) {
             e @ Err(_) => e,
             Ok(results) => Ok(results
                 .into_iter()
-                .filter(|o| predicate.eval(&o))
+                .filter_map(|(space, positions)| {
+                    let filtered = positions
+                        .into_iter()
+                        .filter(|(position, properties)| {
+                            predicate.eval((space, position, properties))
+                        })
+                        .collect::<Vec<_>>();
+                    if filtered.is_empty() {
+                        None
+                    } else {
+                        Some((space, filtered))
+                    }
+                })
                 .collect::<Vec<_>>()),
         },
     }
 }
 
-fn complement(
+fn complement<'c>(
     core_id: &str,
-    parameters: &CoreQueryParameters,
-    core: &Core,
+    parameters: &CoreQueryParameters<'c>,
+    core: &'c Core,
     bag: &Bag,
-) -> mercator_db::ResultSet {
+) -> mercator_db::ResultSet<'c> {
     match bag.execute(core_id, parameters) {
         // FIXME: The complement of a set is computed within its definition space.
         e @ Err(_) => e,
@@ -100,12 +129,12 @@ fn complement(
     }
 }
 
-fn intersection(
+fn intersection<'c>(
     core_id: &str,
-    parameters: &CoreQueryParameters,
+    parameters: &CoreQueryParameters<'c>,
     rh: &Bag,
     lh: &Bag,
-) -> mercator_db::ResultSet {
+) -> mercator_db::ResultSet<'c> {
     let l = lh.execute(core_id, parameters);
     if let Ok(l) = l {
         let r = rh.execute(core_id, parameters);
@@ -134,12 +163,12 @@ fn intersection(
     }
 }
 
-fn union(
+fn union<'c>(
     core_id: &str,
-    parameters: &CoreQueryParameters,
+    parameters: &CoreQueryParameters<'c>,
     rh: &Bag,
     lh: &Bag,
-) -> mercator_db::ResultSet {
+) -> mercator_db::ResultSet<'c> {
     let l = lh.execute(core_id, parameters);
     if let Ok(mut l) = l {
         let r = rh.execute(core_id, parameters);
@@ -159,7 +188,11 @@ fn union(
     }
 }
 
-fn bag(core_id: &str, parameters: &CoreQueryParameters, bags: &[Bag]) -> mercator_db::ResultSet {
+fn bag<'c>(
+    core_id: &str,
+    parameters: &CoreQueryParameters<'c>,
+    bags: &[Bag],
+) -> mercator_db::ResultSet<'c> {
     let mut v = vec![];
     for bag in bags {
         let b = bag.execute(core_id, parameters);
@@ -176,7 +209,11 @@ fn bag(core_id: &str, parameters: &CoreQueryParameters, bags: &[Bag]) -> mercato
     Ok(v)
 }
 
-fn inside(parameters: &CoreQueryParameters, core: &Core, shape: &Shape) -> mercator_db::ResultSet {
+fn inside<'c>(
+    parameters: &CoreQueryParameters<'c>,
+    core: &'c Core,
+    shape: &Shape,
+) -> mercator_db::ResultSet<'c> {
     let db = parameters.db;
     let param = match shape {
         Shape::Point(space_id, position) => {
@@ -220,7 +257,11 @@ fn inside(parameters: &CoreQueryParameters, core: &Core, shape: &Shape) -> merca
     }
 }
 
-fn outside(parameters: &CoreQueryParameters, core: &Core, shape: &Shape) -> mercator_db::ResultSet {
+fn outside<'c>(
+    parameters: &CoreQueryParameters<'c>,
+    core: &'c Core,
+    shape: &Shape,
+) -> mercator_db::ResultSet<'c> {
     match shape {
         Shape::Point(space_id, position) => {
             let position: Vec<f64> = position.into();
@@ -273,10 +314,14 @@ fn outside(parameters: &CoreQueryParameters, core: &Core, shape: &Shape) -> merc
     }
 }
 
-impl Executor for Projection {
-    type ResultSet = mercator_db::ResultSet;
+impl<'e> Executor<'e> for Projection {
+    type ResultSet = mercator_db::ResultSet<'e>;
 
-    fn execute(&self, core_id: &str, parameters: &CoreQueryParameters) -> Self::ResultSet {
+    fn execute<'f: 'e>(
+        &self,
+        core_id: &str,
+        parameters: &CoreQueryParameters<'f>,
+    ) -> Self::ResultSet {
         match self {
             Projection::Nifti(_, _, _bag) => Err("Proj-Nifti: not yet implemented".to_string()),
             Projection::JSON(_, _format, bag) => {
@@ -287,10 +332,14 @@ impl Executor for Projection {
     }
 }
 
-impl Executor for Bag {
-    type ResultSet = mercator_db::ResultSet;
+impl<'e> Executor<'e> for Bag {
+    type ResultSet = mercator_db::ResultSet<'e>;
 
-    fn execute(&self, core_id: &str, parameters: &CoreQueryParameters) -> Self::ResultSet {
+    fn execute<'f: 'e>(
+        &self,
+        core_id: &str,
+        parameters: &CoreQueryParameters<'f>,
+    ) -> Self::ResultSet {
         let core = parameters.db.core(core_id)?;
 
         match self {

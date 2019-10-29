@@ -32,7 +32,7 @@ fn main() {
         output_space: None,
         threshold_volume: None,
         view_port: &None,
-        resolution: None,
+        resolution: &None,
     };
     let parser = QueryParser::new();
     let parser = FiltersParser::new();
