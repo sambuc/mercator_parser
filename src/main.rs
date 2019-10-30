@@ -32,7 +32,7 @@ fn main() {
         output_space: None,
         threshold_volume: None,
         view_port: &None,
-        resolution: &None,
+        resolution: &Some(vec![0]),
     };
     let parser = QueryParser::new();
     let parser = FiltersParser::new();
@@ -91,7 +91,7 @@ fn main() {
                         }
 
                         if let Ok(r) = execute {
-                            //let r = model::to_spatial_objects(&db, r);
+                            //let r = mercator_db::json::model::to_spatial_objects(&db, r);
                             info!("Execution: \n{:#?}", r);
                             info!("NB results: {:?}", r.len());
                         } else {
