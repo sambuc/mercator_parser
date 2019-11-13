@@ -412,16 +412,16 @@ impl LiteralSelector {
     }
 
     // FIXME: THIS IS SOOO WRONG
-    pub fn str<'e>(&self, object: (&'e String, &'e space::Position, &'e Properties)) -> String {
+    pub fn str<'e>(&self, object: (&'e String, &'e space::Position, &'e Properties)) -> &'e str {
         let LiteralSelector(v) = self;
         let last = v.last();
         if let Some(Field(name, _)) = last {
             if name == "id" {
-                return object.2.id().into();
+                return object.2.id();
             } else if name == "type" {
-                return object.2.type_name().into();
+                return object.2.type_name();
             } else if name == "reference_space" {
-                return object.0.clone();
+                return object.0;
             }
         }
 
