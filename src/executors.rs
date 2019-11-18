@@ -80,33 +80,68 @@ fn distinct<'c>(
         }
     }
 }
+fn filter_helper<'c>(
+    predicate: &Predicate,
+    bag: &Bag,
+    core_id: &str,
+    parameters: &CoreQueryParameters<'c>,
+) -> mercator_db::ResultSet<'c> {
+    match bag.execute(core_id, parameters) {
+        e @ Err(_) => e,
+        Ok(results) => Ok(results
+            .into_iter()
+            .filter_map(|(space, positions)| {
+                let filtered = positions
+                    .into_iter()
+                    .filter(|(position, properties)| predicate.eval((space, position, properties)))
+                    .collect::<Vec<_>>();
+                if filtered.is_empty() {
+                    None
+                } else {
+                    Some((space, filtered))
+                }
+            })
+            .collect::<Vec<_>>()),
+    }
+}
 
 fn filter<'c>(
     core_id: &str,
     parameters: &CoreQueryParameters<'c>,
     predicate: &Option<Predicate>,
-    bag: &Bag,
+    bag: &Option<Box<Bag>>,
 ) -> mercator_db::ResultSet<'c> {
     match predicate {
-        None => bag.execute(core_id, parameters),
-        Some(predicate) => match bag.execute(core_id, parameters) {
-            e @ Err(_) => e,
-            Ok(results) => Ok(results
-                .into_iter()
-                .filter_map(|(space, positions)| {
-                    let filtered = positions
-                        .into_iter()
-                        .filter(|(position, properties)| {
-                            predicate.eval((space, position, properties))
-                        })
-                        .collect::<Vec<_>>();
-                    if filtered.is_empty() {
-                        None
-                    } else {
-                        Some((space, filtered))
-                    }
-                })
-                .collect::<Vec<_>>()),
+        None => {
+            if let Some(bag) = bag {
+                bag.execute(core_id, parameters)
+            } else {
+                Err("Filter without predicate nor data set.".to_string())
+            }
+        }
+        Some(predicate) => match bag {
+            None => {
+                let (low, high) = space::Space::universe().bounding_box();
+                let low: Vec<_> = low.into();
+                let high: Vec<_> = high.into();
+                let shape = Shape::HyperRectangle(
+                    space::Space::universe().name().clone(),
+                    vec![
+                        LiteralPosition(
+                            low.into_iter()
+                                .map(LiteralNumber::Float)
+                                .collect::<Vec<_>>(),
+                        ),
+                        LiteralPosition(
+                            high.into_iter()
+                                .map(LiteralNumber::Float)
+                                .collect::<Vec<_>>(),
+                        ),
+                    ],
+                );
+                filter_helper(predicate, &Bag::Inside(shape), core_id, parameters)
+            }
+            Some(bag) => filter_helper(predicate, bag.as_ref(), core_id, parameters),
         },
     }
 }
@@ -248,6 +283,10 @@ fn inside<'c>(
             //FIXME: RADIUS IS A LENGTH, HOW TO ENCODE IT INTO THE SPACE?
             Ok((space_id, space::Shape::HyperSphere(position, radius)))
         }
+        Shape::Label(_, id) => {
+            // Not a real shape, so short circuit and return.
+            return core.get_by_label(parameters, id);
+        }
         Shape::Nifti(_space_id) => Err("Inside-Nifti: not yet implemented".to_string()),
     };
 
@@ -310,6 +349,7 @@ fn outside<'c>(
                 Ok(inside) => complement_helper(core, parameters, space_id, inside),
             }
         }
+        Shape::Label(_, _) => Err("Label: not yet implemented".to_string()),
         Shape::Nifti(_space_id) => Err("Outside-nifti: not yet implemented".to_string()),
     }
 }

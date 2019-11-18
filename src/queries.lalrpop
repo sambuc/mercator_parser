@@ -153,6 +153,8 @@ Bags: symbols::Bag = {
     // Spatial Operators
     Inside,
     Outside,
+    // returns the positions or volume of the shape, instead of the data points in or outside it.
+    //Shape,
 };
 
 //*********************************************************************/
@@ -187,9 +189,13 @@ Union: symbols::Bag = {
 Filter: symbols::Bag = {
 //     "filter" "(" <p:Predicates> "," <b:Bags> ")" =>
     "filter" "(" <b:Bags> ")" =>
-        symbols::Bag::Filter(None, Box::new(b)),
+        symbols::Bag::Filter(None, Some(Box::new(b))),
     "filter" "(" <p:Predicates> <b:("," <Bags> )?> ")" =>
-        symbols::get_filter(p, b)
+        match b {
+            None => symbols::Bag::Filter(Some(p), None),
+            Some(b) => symbols::Bag::Filter(Some(p), Some(Box::new(b))),
+        }
+
 };
 
 Predicates: symbols::Predicate = {
@@ -272,6 +278,12 @@ Inside: symbols::Bag = {
         symbols::Bag::Inside(<>)
 };
 
+//FIXME: ADD A SHAPE VARIANT WHICH JUST RETURNS ALL THE POSITIONS OF THAT SHAPE
+//Shape: symbols::Bag = {
+//    <Shapes> =>
+//    symbols::Bag::Shape(<>)
+//}
+
 //*********************************************************************/
 // SHAPES                                                             */
 //*********************************************************************/
@@ -282,6 +294,7 @@ Shapes: symbols::Shape = {
     Point,
     HyperRectangle,
     HyperSphere,
+    Label,
     Nifti
 };
 
@@ -330,6 +343,21 @@ Point: symbols::Shape = {
         };
 
         symbols::Shape::Point(space_id, pos)
+    }
+};
+
+// Filter by Label, a.k.a use an ID to define a volume, and use that volume to
+// select data points.
+Label: symbols::Shape = {
+    "label" "{"
+        <id:String>
+        <rs:( "," <String> )?>
+    "}" => {
+        let space_id = match rs {
+            Some(id) => id,
+            None => Space::universe().name().clone(),
+        };
+        symbols::Shape::Label(space_id, id)
     }
 };
 

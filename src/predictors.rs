@@ -1,3 +1,4 @@
+use mercator_db::space;
 use mercator_db::DataBase;
 
 use super::expressions::Predictor;
@@ -17,7 +18,10 @@ impl Predictor for Bag {
         match self {
             Bag::ViewPort(bag) => bag.predict(db),
             Bag::Distinct(bag) => bag.predict(db),
-            Bag::Filter(_, bag) => bag.predict(db),
+            Bag::Filter(_, bag) => match bag {
+                None => Ok(db.space(space::Space::universe().name())?.volume()),
+                Some(b) => b.predict(db),
+            },
             Bag::Complement(bag) => Ok(db.space(bag.space())?.volume() - bag.predict(db)?),
             Bag::Intersection(lh, rh) => {
                 let l = lh.predict(db)?;

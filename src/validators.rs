@@ -56,7 +56,10 @@ impl Validator for Bag {
         match self {
             Bag::ViewPort(bag) => bag.validate(),
             Bag::Distinct(bag) => bag.validate(),
-            Bag::Filter(_, bag) => bag.validate(),
+            Bag::Filter(_, bag) => match bag {
+                None => Ok(LiteralPosition(vec![]).get_type()),
+                Some(b) => b.validate(),
+            },
             Bag::Complement(bag) => bag.validate(),
             Bag::Intersection(lh, rh) => compare_bag_types(lh, rh),
             Bag::Union(lh, rh) => compare_bag_types(lh, rh),
@@ -149,6 +152,10 @@ impl Validator for Shape {
                 }
             }
             Shape::HyperSphere(_, pos, _) => pos.validate(),
+            Shape::Label(_, _) => {
+                // FIXME: Quick Hack, we need to fix this and return the effective type of the object Id.
+                Ok(LiteralPosition(vec![]).get_type())
+            }
             Shape::Nifti(_) => Err("not yet implemented".to_string()),
         }
     }

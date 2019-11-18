@@ -19,6 +19,7 @@ bag_expression
     // Spatial Operators
     | inside
     | outside
+    //| shape
     ;
 
 /**********************************************************************/
@@ -111,6 +112,11 @@ outside
 /* Returns the set of points inside the shape, (face included) */
 inside
     : 'inside' '(' shapes ')'
+    ;
+
+/* Returns the set of positions inside the shape, (face included) */
+shape
+    : 'shape' '(' shapes ')'
     ;
 
 /**********************************************************************/

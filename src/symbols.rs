@@ -61,7 +61,7 @@ pub enum Bag {
     ViewPort(Box<Bag>),
     // Bags
     Distinct(Box<Bag>),
-    Filter(Option<Predicate>, Box<Bag>),
+    Filter(Option<Predicate>, Option<Box<Bag>>),
     Complement(Box<Bag>),
     Intersection(Box<Bag>, Box<Bag>),
     Union(Box<Bag>, Box<Bag>),
@@ -77,7 +77,10 @@ impl Bag {
         match self {
             Bag::ViewPort(bag) => bag.space(),
             Bag::Distinct(bag) => bag.space(),
-            Bag::Filter(_, bag) => bag.space(),
+            Bag::Filter(_, bag) => match bag {
+                None => space::Space::universe().name(),
+                Some(b) => b.space(),
+            },
             Bag::Complement(bag) => bag.space(),
             Bag::Intersection(lh, _) => {
                 // We are assuming lh and rh are in the same space.
@@ -124,6 +127,7 @@ pub enum Shape {
     Point(String, LiteralPosition),
     HyperRectangle(String, Vec<LiteralPosition>),
     HyperSphere(String, LiteralPosition, LiteralNumber),
+    Label(String, String),
     Nifti(String),
 }
 
@@ -133,6 +137,7 @@ impl Shape {
             Shape::Point(space, _) => space,
             Shape::HyperRectangle(space, _) => space,
             Shape::HyperSphere(space, _, _) => space,
+            Shape::Label(space, _) => space,
             Shape::Nifti(space) => space,
         }
     }
@@ -201,8 +206,16 @@ impl Shape {
 
                 a * radius.powi(i as i32)
             }
-            Shape::Nifti(_) => unimplemented!(),
+            Shape::Label(_, _) => {
+                // FIXME: Needs to find a way to figure out the approximate volume of this specific ID, or return MAX or MIN..
+                std::f64::EPSILON
+            }
+            Shape::Nifti(_) => unimplemented!("Nifti"),
         }
+    }
+
+    pub fn rasterize<'e>(&self) -> mercator_db::ResultSet<'e> {
+        unimplemented!("rasterize")
     }
 }
 
@@ -426,37 +439,7 @@ impl LiteralSelector {
         }
 
         println!("LiteralSelector.str(): {:?}", self);
-        unimplemented!();
-    }
-}
-
-// The logic was getting a bit too complex to be embedded directly into the
-// grammar definition.
-pub fn get_filter(p: Predicate, b: Option<Bag>) -> Bag {
-    match b {
-        Some(b) => Bag::Filter(Some(p), Box::new(b)),
-        None => {
-            let (low, high) = space::Space::universe().bounding_box();
-            let low: Vec<_> = low.into();
-            let high: Vec<_> = high.into();
-            let bb = Shape::HyperRectangle(
-                space::Space::universe().name().clone(),
-                vec![
-                    LiteralPosition(
-                        low.into_iter()
-                            .map(LiteralNumber::Float)
-                            .collect::<Vec<_>>(),
-                    ),
-                    LiteralPosition(
-                        high.into_iter()
-                            .map(LiteralNumber::Float)
-                            .collect::<Vec<_>>(),
-                    ),
-                ],
-            );
-
-            Bag::Filter(Some(p), Box::new(Bag::Inside(bb)))
-        }
+        unimplemented!("Unknown Field");
     }
 }
 

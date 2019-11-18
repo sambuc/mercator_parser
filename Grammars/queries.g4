@@ -18,7 +18,7 @@ projection_operators
  *
  * If it is provided, it MUST resolve to a NUMBER. */
 nifti_operator
-    : 'nifti' '(' ( STRING ',' )? ( selector ',' )? bag_expression ')'
+    : 'nifti' '(' ( selector ',' )? bag_expression ( ',' STRING )? ')'
     ;
 
 json_operator

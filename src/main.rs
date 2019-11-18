@@ -94,7 +94,7 @@ fn main() {
                         }
 
                         if let Ok(r) = execute {
-                            //let r = mercator_db::json::model::to_spatial_objects(&db, r);
+                            //let r = mercator_db::json::model::to_spatial_objects(r);
                             info!("Execution: \n{:#?}", r);
                             info!("NB results: {:?}", r.len());
                         } else {
