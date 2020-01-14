@@ -27,6 +27,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "parser-driver"
 path = "src/main.rs"
+required-features = ["bin"]
+
+[features]
+bin = ["measure_time", "pretty_env_logger"]
 
 [dependencies]
 mercator_db = "^0.1"
@@ -34,12 +38,13 @@ mercator_db = "^0.1"
 lalrpop-util = "^0.17"
 regex = "^1.2"
 
-measure_time = "^0.6" # To mesure parsing time, only required by binary
-
 # Logging macros API
 #log = { version = "^0.4", features = ["max_level_trace", "release_max_level_info"] }
 log = { version = "^0.4", features = ["max_level_trace", "release_max_level_trace"] }
-pretty_env_logger = "^0.3"       # Logger implementation
+
+# Used for main.rs
+pretty_env_logger =  { version = "^0.3", optional = true }  # Logger implementation
+measure_time = { version = "^0.6", optional = true }  # To mesure parsing time, only required by binary
 
 [build-dependencies]
 lalrpop = "^0.17.1"
