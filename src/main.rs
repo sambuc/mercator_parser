@@ -26,7 +26,8 @@ fn main() {
     let db;
     {
         info_time!("Loading database index");
-        db = DataBase::load(&[&format!("{}.index", core)]).unwrap();
+        db = DataBase::load(&[&format!("{}.index", core)])
+            .unwrap_or_else(|e| panic!("Unable to load database '{}': {}", core, e));
     }
 
     let parameters = CoreQueryParameters {
