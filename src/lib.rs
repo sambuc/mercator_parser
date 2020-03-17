@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate lalrpop_util;
 
-lalrpop_mod!(#[allow(clippy::all)] pub queries); // synthesized by LALRPOP
+lalrpop_mod!(#[allow(clippy::all,unused_parens)] pub queries); // synthesized by LALRPOP
 
 mod evaluators;
 mod executors;
