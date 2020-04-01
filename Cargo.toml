@@ -21,7 +21,7 @@ include = ["Cargo.toml", "README.md", "LICENSE", "ACKNOWLEDGEMENTS", "src/**/*.r
 build = "build.rs" # LALRPOP preprocessing
 
 [lib]
-name = "parser"
+name = "mercator_parser"
 path = "src/lib.rs"
 
 [[bin]]
