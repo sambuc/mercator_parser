@@ -22,40 +22,6 @@ This enables the index implementations to be agnostic from the underlying data s
 
  * Rust: https://www.rust-lang.org
 
-## Quick start
-
-## Building from sources
-
-To build this project, you will need to run the following:
-
-```sh
-cargo build --release
-```
-
-### Installation
-
-To install the software on the system you can use:
-
-```sh
-cargo install --release
-```
-
-### Usage
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin vehicula pretium
-quam sit amet facilisis. Class aptent taciti sociosqu ad litora torquent per
-conubia nostra, per inceptos himenaeos. Curabitur metus sapien, rhoncus vitae
-eleifend nec, convallis vel nunc. Nulla metus mauris, porta eu porta eu,
-vulputate et est. Suspendisse lacinia leo vel auctor aliquet. Maecenas non arcu
-libero. Nulla ut eleifend dui. Cras bibendum pharetra facilisis. Proin mattis
-libero non pharetra tristique. Nam massa nulla, ultrices pharetra quam a,
-fermentum placerat dolor. Nullam mollis libero et neque lobortis, id dignissim
-lectus dignissim. Maecenas ligula enim, congue in ornare vel, volutpat ut ante.
-
-```sh
-cargo run --release
-```
-
 ## Documentation
 
 For more information, please refer to the [documentation](https://epfl-dias.github.io/mercator_parser/).
