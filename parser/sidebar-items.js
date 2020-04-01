@@ -1,1 +1,0 @@
-initSidebarItems({"mod":[["queries",""]],"struct":[["FiltersParser",""],["QueryParser",""]],"trait":[["Executor",""],["Predictor",""],["Validator",""]],"type":[["ValidationResult",""]]});
