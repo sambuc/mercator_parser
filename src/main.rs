@@ -7,11 +7,11 @@ use std::io;
 
 use mercator_db::CoreQueryParameters;
 use mercator_db::DataBase;
-use parser::Executor;
-use parser::FiltersParser;
-use parser::Predictor;
-use parser::QueryParser;
-use parser::Validator;
+use mercator_parser::Executor;
+use mercator_parser::FiltersParser;
+use mercator_parser::Predictor;
+use mercator_parser::QueryParser;
+use mercator_parser::Validator;
 
 fn main() {
     // If RUST_LOG is unset, set it to INFO, otherwise keep it as-is.

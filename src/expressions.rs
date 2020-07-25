@@ -14,10 +14,10 @@ pub trait Predictor {
 pub trait Executor<'e> {
     type ResultSet;
 
-    fn execute<'f: 'e>(
-        &self,
-        core_id: &str,
-        parameters: &CoreQueryParameters<'f>,
+    fn execute(
+        &'e self,
+        core_id: &'e str,
+        parameters: &'e CoreQueryParameters<'e>,
     ) -> Self::ResultSet;
 }
 
