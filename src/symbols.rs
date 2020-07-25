@@ -61,7 +61,7 @@ pub enum Bag {
     ViewPort(Box<Bag>),
     // Bags
     Distinct(Box<Bag>),
-    Filter(Option<Predicate>, Option<Box<Bag>>),
+    Filter(Option<Predicate>, Box<Bag>),
     Complement(Box<Bag>),
     Intersection(Box<Bag>, Box<Bag>),
     Union(Box<Bag>, Box<Bag>),
@@ -77,10 +77,7 @@ impl Bag {
         match self {
             Bag::ViewPort(bag) => bag.space(),
             Bag::Distinct(bag) => bag.space(),
-            Bag::Filter(_, bag) => match bag {
-                None => space::Space::universe().name(),
-                Some(b) => b.space(),
-            },
+            Bag::Filter(_, bag) => bag.space(),
             Bag::Complement(bag) => bag.space(),
             Bag::Intersection(lh, _) => {
                 // We are assuming lh and rh are in the same space.

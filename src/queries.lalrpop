@@ -189,13 +189,25 @@ Union: symbols::Bag = {
 Filter: symbols::Bag = {
 //     "filter" "(" <p:Predicates> "," <b:Bags> ")" =>
     "filter" "(" <b:Bags> ")" =>
-        symbols::Bag::Filter(None, Some(Box::new(b))),
-    "filter" "(" <p:Predicates> <b:("," <Bags> )?> ")" =>
+        symbols::Bag::Filter(None, Box::new(b)),
+    "filter" "(" <p:Predicates> <b:("," <Bags> )?> ")" => {
         match b {
-            None => symbols::Bag::Filter(Some(p), None),
-            Some(b) => symbols::Bag::Filter(Some(p), Some(Box::new(b))),
+            None => {
+                let (low, high) = Space::universe().bounding_box();
+                let low: Vec<_> = low.into();
+                let high: Vec<_> = high.into();
+                let shape = symbols::Shape::HyperRectangle(
+                    Space::universe().name().clone(),
+                    vec![
+                        symbols::LiteralPosition(low.into_iter().map(symbols::LiteralNumber::Float).collect()),
+                        symbols::LiteralPosition(high.into_iter().map(symbols::LiteralNumber::Float).collect()),
+                    ],
+                );
+                symbols::Bag::Filter(Some(p), Box::new(symbols::Bag::Inside(shape)))
+            }
+            Some(b) => symbols::Bag::Filter(Some(p), Box::new(b)),
         }
-
+    },
 };
 
 Predicates: symbols::Predicate = {
