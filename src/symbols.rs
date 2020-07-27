@@ -57,8 +57,6 @@ struct Transform {
 /**********************************************************************/
 #[derive(Clone, Debug)]
 pub enum Bag {
-    // This is an implicit operator, inserted by the parser. Never to be used directly.
-    ViewPort(Box<Bag>),
     // Bags
     Distinct(Box<Bag>),
     Filter(Option<Predicate>, Box<Bag>),
@@ -75,7 +73,6 @@ pub enum Bag {
 impl Bag {
     pub fn space(&self) -> &String {
         match self {
-            Bag::ViewPort(bag) => bag.space(),
             Bag::Distinct(bag) => bag.space(),
             Bag::Filter(_, bag) => bag.space(),
             Bag::Complement(bag) => bag.space(),
@@ -240,7 +237,11 @@ impl Position {
                     Ordering::Greater => 1,
                     Ordering::Less => -1,
                 };
-                LiteralPosition(vec![LiteralNumber::Int(x)])
+
+                let mut v = Vec::with_capacity(1);
+                v.push(LiteralNumber::Int(x));
+
+                LiteralPosition(v)
             }
         }
     }
@@ -259,14 +260,33 @@ pub enum LiteralNumber {
     Float(f64),
 }
 
-impl From<&LiteralNumber> for Vec<f64> {
+impl From<&LiteralNumber> for f64 {
     fn from(l: &LiteralNumber) -> Self {
-        let r = match l {
+        match l {
             LiteralNumber::Int(x) => (*x) as f64,
             LiteralNumber::Float(x) => *x,
-        };
+        }
+    }
+}
 
-        vec![r]
+impl From<LiteralNumber> for f64 {
+    fn from(l: LiteralNumber) -> Self {
+        (&l).into()
+    }
+}
+
+impl From<&LiteralNumber> for space::Coordinate {
+    fn from(literal: &LiteralNumber) -> Self {
+        match literal {
+            LiteralNumber::Float(f) => (*f).into(),
+            LiteralNumber::Int(i) => (*i as u64).into(),
+        }
+    }
+}
+
+impl From<LiteralNumber> for space::Coordinate {
+    fn from(literal: LiteralNumber) -> Self {
+        (&literal).into()
     }
 }
 
@@ -291,7 +311,7 @@ pub struct LiteralPosition(pub Vec<LiteralNumber>);
 impl LiteralPosition {
     pub fn get_type(&self) -> LiteralTypes {
         let Self(v) = self;
-        let mut t = Vec::new();
+        let mut t = Vec::with_capacity(v.len());
 
         for n in v {
             t.push(match n {
@@ -324,34 +344,35 @@ impl LiteralPosition {
     }
 }
 
-impl From<&LiteralNumber> for f64 {
-    fn from(l: &LiteralNumber) -> Self {
-        match l {
-            LiteralNumber::Int(x) => (*x) as f64,
-            LiteralNumber::Float(x) => *x,
+impl From<&LiteralPosition> for Vec<f64> {
+    fn from(l: &LiteralPosition) -> Self {
+        // Speed-wise this should be the same, the downside is the newly
+        // allocated vector might be suboptimal in terms of space.
+        //let LiteralPosition(v) = l;
+        //v.iter().map(|literal| literal.into()).collect()
+
+        let LiteralPosition(v) = l;
+        let mut lv = Vec::with_capacity(v.len());
+        for value in v {
+            lv.push(value.into());
         }
+
+        lv
     }
 }
 
-impl From<&LiteralPosition> for Vec<f64> {
-    fn from(l: &LiteralPosition) -> Self {
-        let LiteralPosition(v) = l;
-        let mut r = Vec::with_capacity(v.len());
-
-        for x in v {
-            let x = match x {
-                LiteralNumber::Int(x) => (*x) as f64,
-                LiteralNumber::Float(x) => *x,
-            };
-            r.push(x);
-        }
-
-        r
+impl From<LiteralPosition> for Vec<f64> {
+    fn from(l: LiteralPosition) -> Self {
+        (&l).into()
     }
 }
 
 impl From<&Vec<f64>> for LiteralPosition {
     fn from(v: &Vec<f64>) -> Self {
+        // Speed-wise this should be the same, the downside is the newly
+        // allocated vector might be suboptimal in terms of space.
+        //LiteralPosition(v.iter().map(|value| LiteralNumber::Float(*value)).collect())
+
         let mut lv = Vec::with_capacity(v.len());
         for value in v {
             lv.push(LiteralNumber::Float(*value));
@@ -360,10 +381,36 @@ impl From<&Vec<f64>> for LiteralPosition {
         LiteralPosition(lv)
     }
 }
+
+impl From<Vec<f64>> for LiteralPosition {
+    fn from(v: Vec<f64>) -> Self {
+        (&v).into()
+    }
+}
+
 impl From<&space::Position> for LiteralPosition {
     fn from(position: &space::Position) -> Self {
-        let lv: Vec<f64> = position.into();
-        (&lv).into()
+        let position: Vec<f64> = position.into();
+        position.into()
+    }
+}
+
+impl From<space::Position> for LiteralPosition {
+    fn from(position: space::Position) -> Self {
+        (&position).into()
+    }
+}
+
+impl From<&LiteralPosition> for space::Position {
+    fn from(position: &LiteralPosition) -> Self {
+        let position: Vec<f64> = position.into();
+        position.into()
+    }
+}
+
+impl From<LiteralPosition> for space::Position {
+    fn from(position: LiteralPosition) -> Self {
+        (&position).into()
     }
 }
 

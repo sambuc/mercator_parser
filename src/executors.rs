@@ -1,366 +1,355 @@
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use mercator_db::space;
 use mercator_db::Core;
 use mercator_db::CoreQueryParameters;
-use mercator_db::Properties;
+use mercator_db::IterObjects;
+use mercator_db::IterObjectsBySpaces;
 
 use super::expressions::*;
 use super::symbols::*;
 
-impl From<&LiteralPosition> for space::Position {
-    fn from(literal: &LiteralPosition) -> Self {
-        let v: Vec<f64> = literal.into();
-        v.into()
+fn group_by_space<'s>(
+    list: IterObjectsBySpaces<'s>,
+) -> Box<dyn Iterator<Item = (&'s String, IterObjects<'s>)> + 's> {
+    // Filter per Properties, in order to regroup by it, then build
+    // a single SpatialObject per Properties.
+    let mut hashmap = HashMap::new();
+    for (space, objects) in list {
+        hashmap.entry(space).or_insert_with(Vec::new).push(objects);
     }
+
+    Box::new(hashmap.into_iter().map(|(space, objects)| {
+        let objects: IterObjects = Box::new(objects.into_iter().flatten());
+        (space, objects)
+    }))
 }
 
-impl From<&LiteralNumber> for space::Coordinate {
-    fn from(literal: &LiteralNumber) -> Self {
-        match literal {
-            LiteralNumber::Float(f) => (*f).into(),
-            LiteralNumber::Int(i) => (*i as u64).into(),
-        }
-    }
+fn distinct_helper(list: IterObjectsBySpaces) -> IterObjectsBySpaces {
+    // Make sure to collect all objects iterators per space, so that
+    // each space appears only once.
+    group_by_space(list)
+        // We would lose some objects otherwise when creating the
+        // HashMaps. Also this makes sure to keep the values are unique.
+        .map(|(space, iter)| {
+            let uniques: HashSet<_> = iter.collect();
+            let uniques: IterObjects = Box::new(uniques.into_iter());
+            (space, uniques)
+        })
+        .collect()
 }
 
-fn complement_helper<'c>(
-    core: &'c Core,
-    parameters: &CoreQueryParameters<'c>,
-    space_id: &str,
-    inside: Vec<(&'c String, Vec<(space::Position, &'c Properties)>)>,
-) -> mercator_db::ResultSet<'c> {
+fn into_positions_hashset(
+    objects_by_spaces: IterObjectsBySpaces,
+) -> HashMap<&String, Rc<HashSet<space::Position>>> {
+    // Make sure to collect all objects iterators per space, so that
+    // each space appears only once.
+    group_by_space(objects_by_spaces)
+        // We would lose some objects otherwise when creating the HashSets.
+        .map(|(space, iter)| {
+            let hash_set: HashSet<_> = iter.map(|(position, _)| position).collect();
+            (space, Rc::new(hash_set))
+        })
+        .collect::<HashMap<_, _>>()
+}
+
+// Strictly not inside nor on the surface.
+// TODO: inside must contains the valid positions in all expected spaces
+fn complement_helper<'h>(
+    core: &'h Core,
+    parameters: &'h CoreQueryParameters<'h>,
+    space_id: &'h str,
+    inside: IterObjectsBySpaces<'h>,
+) -> mercator_db::ResultSet<'h> {
     let (low, high) = parameters.db.space(space_id)?.bounding_box();
-    match core.get_by_shape(parameters, &space::Shape::BoundingBox(low, high), space_id) {
-        e @ Err(_) => e,
-        Ok(points) => {
-            let hashmap = inside.into_iter().collect::<HashMap<_, _>>();
+    let inside = into_positions_hashset(inside);
+    let points = core.get_by_shape(parameters, space::Shape::BoundingBox(low, high), space_id)?;
 
-            Ok(points
-                .into_iter()
-                .filter_map(|(space, v)| match hashmap.get(space) {
-                    None => None,
-                    Some(list) => {
-                        Some((space, v.into_iter().filter(|t| !list.contains(t)).collect()))
-                    }
-                })
-                .collect::<Vec<_>>())
-        }
-    }
+    let results = points
+        .into_iter()
+        .filter_map(move |(space, v)| match inside.get(space) {
+            None => None, // Space not found, so no point might exist!
+            Some(volume) => {
+                let volume = volume.clone();
+                let iter: IterObjects = Box::new(v.filter(move |a| !volume.contains(&a.0)));
+
+                Some((space, iter))
+            }
+        })
+        .collect();
+    Ok(results)
 }
 
-fn view_port<'c>(
-    core_id: &str,
-    parameters: &CoreQueryParameters<'c>,
-    bag: &Bag,
-) -> mercator_db::ResultSet<'c> {
-    if let Some((low, high)) = parameters.view_port {
-        let vp = Bag::Inside(Shape::HyperRectangle(
-            bag.space().clone(),
-            vec![low.into(), high.into()],
-        ));
-        intersection(core_id, parameters, &vp, bag)
-    } else {
-        bag.execute(core_id, parameters)
-    }
-}
+// Intersection based only on spatial positions!
+fn intersect_helper<'h>(
+    smaller: IterObjectsBySpaces<'h>,
+    bigger: IterObjectsBySpaces<'h>,
+) -> IterObjectsBySpaces<'h> {
+    let smaller = into_positions_hashset(smaller);
 
-fn distinct<'c>(
-    core_id: &str,
-    parameters: &CoreQueryParameters<'c>,
-    bag: &Bag,
-) -> mercator_db::ResultSet<'c> {
-    match bag.execute(core_id, parameters) {
-        e @ Err(_) => e,
-        Ok(mut v) => {
-            let set: HashSet<_> = v.drain(..).collect(); // dedup
-            v.extend(set.into_iter());
+    bigger
+        .into_iter()
+        .filter_map(
+            move |(space, bigger_object_iter)| match smaller.get(space) {
+                None => None,
+                Some(volume) => {
+                    let volume = volume.clone();
+                    let filtered: IterObjects =
+                        Box::new(bigger_object_iter.filter(move |a| volume.contains(&a.0)));
 
-            Ok(v)
-        }
-    }
-}
-fn filter_helper<'c>(
-    predicate: &Predicate,
-    bag: &Bag,
-    core_id: &str,
-    parameters: &CoreQueryParameters<'c>,
-) -> mercator_db::ResultSet<'c> {
-    match bag.execute(core_id, parameters) {
-        e @ Err(_) => e,
-        Ok(results) => Ok(results
-            .into_iter()
-            .filter_map(|(space, positions)| {
-                let filtered = positions
-                    .into_iter()
-                    .filter(|(position, properties)| predicate.eval((space, position, properties)))
-                    .collect::<Vec<_>>();
-                if filtered.is_empty() {
-                    None
-                } else {
                     Some((space, filtered))
                 }
-            })
-            .collect::<Vec<_>>()),
-    }
+            },
+        )
+        .collect()
 }
 
-fn filter<'c>(
-    core_id: &str,
-    parameters: &CoreQueryParameters<'c>,
-    predicate: &Option<Predicate>,
-    bag: &Option<Box<Bag>>,
-) -> mercator_db::ResultSet<'c> {
-    match predicate {
-        None => {
-            if let Some(bag) = bag {
-                bag.execute(core_id, parameters)
-            } else {
-                Err("Filter without predicate nor data set.".to_string())
-            }
-        }
-        Some(predicate) => match bag {
-            None => {
-                let (low, high) = space::Space::universe().bounding_box();
-                let low: Vec<_> = low.into();
-                let high: Vec<_> = high.into();
-                let shape = Shape::HyperRectangle(
-                    space::Space::universe().name().clone(),
-                    vec![
-                        LiteralPosition(
-                            low.into_iter()
-                                .map(LiteralNumber::Float)
-                                .collect::<Vec<_>>(),
-                        ),
-                        LiteralPosition(
-                            high.into_iter()
-                                .map(LiteralNumber::Float)
-                                .collect::<Vec<_>>(),
-                        ),
-                    ],
-                );
-                filter_helper(predicate, &Bag::Inside(shape), core_id, parameters)
-            }
-            Some(bag) => filter_helper(predicate, bag.as_ref(), core_id, parameters),
-        },
-    }
-}
+impl Bag {
+    fn distinct<'b>(
+        &'b self,
+        core_id: &'b str,
+        parameters: &'b CoreQueryParameters<'b>,
+    ) -> mercator_db::ResultSet<'b> {
+        let results = self.execute(core_id, parameters)?;
 
-fn complement<'c>(
-    core_id: &str,
-    parameters: &CoreQueryParameters<'c>,
-    core: &'c Core,
-    bag: &Bag,
-) -> mercator_db::ResultSet<'c> {
-    match bag.execute(core_id, parameters) {
-        // FIXME: The complement of a set is computed within its definition space.
-        e @ Err(_) => e,
-        Ok(inside) => complement_helper(
+        Ok(distinct_helper(results))
+    }
+
+    fn complement<'b>(
+        &'b self,
+        core_id: &'b str,
+        parameters: &'b CoreQueryParameters<'b>,
+        core: &'b Core,
+    ) -> mercator_db::ResultSet<'b> {
+        let inside = self.execute(core_id, parameters)?;
+
+        // FIXME: The complement of a set should be computed within its
+        //        definition space. We don't know here so we use universe
+        complement_helper(
             core,
             parameters,
             mercator_db::space::Space::universe().name(),
             inside,
-        ),
+        )
+    }
+
+    fn intersection<'b>(
+        &'b self,
+        core_id: &'b str,
+        parameters: &'b CoreQueryParameters<'b>,
+        rh: &'b Bag,
+    ) -> mercator_db::ResultSet<'b> {
+        let left = self.execute(core_id, parameters)?;
+        let right = rh.execute(core_id, parameters)?;
+
+        let v = if rh.predict(parameters.db) < self.predict(parameters.db) {
+            intersect_helper(right, left)
+        } else {
+            intersect_helper(left, right)
+        };
+
+        Ok(v)
+    }
+
+    fn union<'b>(
+        &'b self,
+        core_id: &'b str,
+        parameters: &'b CoreQueryParameters<'b>,
+        rh: &'b Bag,
+    ) -> mercator_db::ResultSet<'b> {
+        let mut left = self.execute(core_id, parameters)?;
+        let mut right = rh.execute(core_id, parameters)?;
+
+        let union = if rh.predict(parameters.db) < self.predict(parameters.db) {
+            left.append(&mut right);
+            left
+        } else {
+            right.append(&mut left);
+            right
+        };
+
+        Ok(union)
+    }
+
+    fn filter<'b>(
+        &'b self,
+        predicate: &'b Predicate,
+        core_id: &'b str,
+        parameters: &'b CoreQueryParameters<'b>,
+    ) -> mercator_db::ResultSet<'b> {
+        let results = self.execute(core_id, parameters)?;
+
+        Ok(results
+            .into_iter()
+            .map(move |(space, positions)| {
+                let positions = positions.collect::<Vec<_>>();
+                (
+                    space,
+                    Box::new(positions.into_iter().filter(move |(position, properties)| {
+                        predicate.eval((space, position, properties))
+                    })) as IterObjects,
+                )
+            })
+            .collect())
     }
 }
 
-fn intersection<'c>(
-    core_id: &str,
-    parameters: &CoreQueryParameters<'c>,
-    rh: &Bag,
-    lh: &Bag,
-) -> mercator_db::ResultSet<'c> {
-    let l = lh.execute(core_id, parameters);
-    if let Ok(l) = l {
-        let r = rh.execute(core_id, parameters);
-        if let Ok(r) = r {
-            let mut v = vec![];
+impl Shape {
+    fn inside<'s>(
+        &'s self,
+        parameters: &'s CoreQueryParameters<'s>,
+        core: &'s Core,
+    ) -> mercator_db::ResultSet<'s> {
+        let db = parameters.db;
+        let param = match self {
+            Shape::Point(space_id, position) => {
+                let space = db.space(space_id)?;
+                let position: Vec<f64> = position.into();
+                let position = space.encode(&position)?;
+                Ok((space_id, space::Shape::Point(position)))
+            }
+            Shape::HyperRectangle(space_id, bounding_box) => {
+                if bounding_box.len() != 2 {
+                    //FIXME: Support arbitrary HyperRectangles
+                    Err(
+                        "The number of position is different from 2, which is unsupported."
+                            .to_string(),
+                    )
+                } else {
+                    let space = db.space(space_id)?;
+                    let low: Vec<f64> = (&bounding_box[0]).into();
+                    let high: Vec<f64> = (&bounding_box[1]).into();
+                    let low = space.encode(&low)?;
+                    let high = space.encode(&high)?;
 
-            if rh.predict(parameters.db) < lh.predict(parameters.db) {
-                for o in r {
-                    if l.contains(&o) {
-                        v.push(o);
-                    }
-                }
-            } else {
-                for o in l {
-                    if r.contains(&o) {
-                        v.push(o);
-                    }
+                    Ok((space_id, space::Shape::BoundingBox(low, high)))
                 }
             }
-            Ok(v)
-        } else {
-            r
+            Shape::HyperSphere(space_id, position, radius) => {
+                let space = db.space(space_id)?;
+                let position: Vec<f64> = position.into();
+                let position = space.encode(&position)?;
+
+                // We have to provide a position with all the dimensions
+                // for the encoding to work as expected.
+                let mut r = vec![0f64; position.dimensions()];
+                r[0] = radius.into();
+                let radius = space.encode(&r)?[0];
+
+                Ok((space_id, space::Shape::HyperSphere(position, radius)))
+            }
+            Shape::Label(_, id) => {
+                // Not a real shape, so short circuit and return.
+                return core.get_by_label(parameters, id);
+            }
+            Shape::Nifti(_space_id) => Err("Inside-Nifti: not yet implemented".to_string()),
+        };
+
+        match param {
+            Ok((space_id, shape)) => core.get_by_shape(parameters, shape, space_id),
+            Err(e) => Err(e),
         }
-    } else {
-        l
+    }
+
+    fn outside<'s>(
+        &'s self,
+        parameters: &'s CoreQueryParameters<'s>,
+        core: &'s Core,
+    ) -> mercator_db::ResultSet<'s> {
+        let (space_id, inside) = match self {
+            Shape::Point(space_id, position) => {
+                let position: Vec<f64> = position.into();
+                let mut positions = Vec::with_capacity(1);
+                positions.push(position.into());
+                let inside = core.get_by_positions(parameters, positions, space_id)?;
+
+                Ok((space_id, inside))
+            }
+            Shape::HyperRectangle(space_id, bounding_box) => {
+                // We need to adapt the bounding_box to ensure the
+                // surface will not hit as part of the inside set, so we
+                // compute the biggest bounding box contained within the
+                // given box.
+
+                // Smallest increment possible
+                let mut increment = Vec::with_capacity(bounding_box[0].dimensions());
+                for _ in 0..bounding_box[0].dimensions() {
+                    increment.push(std::f64::EPSILON);
+                }
+
+                // Add it to the lower bound
+                let mut low: space::Position = (&bounding_box[0]).into();
+                low += increment.clone().into();
+
+                // Substract it from the upper bound
+                let mut high: space::Position = (&bounding_box[1]).into();
+                high -= increment.into();
+
+                let inside =
+                    core.get_by_shape(parameters, space::Shape::BoundingBox(low, high), space_id)?;
+
+                Ok((space_id, inside))
+            }
+            Shape::HyperSphere(space_id, center, radius) => {
+                // Smallest decrement possible, to exclude the surface
+                let mut radius: f64 = radius.into();
+                radius -= std::f64::EPSILON;
+                let center: space::Position = center.into();
+
+                let inside = core.get_by_shape(
+                    parameters,
+                    space::Shape::HyperSphere(center, radius.into()),
+                    space_id,
+                )?;
+
+                Ok((space_id, inside))
+            }
+            Shape::Label(space_id, id) => {
+                let inside = core.get_by_label(parameters, id)?;
+
+                Ok((space_id, inside))
+            }
+            Shape::Nifti(_space_id) => Err("Outside-nifti: not yet implemented".to_string()),
+        }?;
+
+        complement_helper(core, parameters, space_id, inside)
     }
 }
 
-fn union<'c>(
-    core_id: &str,
-    parameters: &CoreQueryParameters<'c>,
-    rh: &Bag,
-    lh: &Bag,
+fn filter<'c>(
+    core_id: &'c str,
+    parameters: &'c CoreQueryParameters<'c>,
+    predicate: &'c Option<Predicate>,
+    bag: &'c Bag,
 ) -> mercator_db::ResultSet<'c> {
-    let l = lh.execute(core_id, parameters);
-    if let Ok(mut l) = l {
-        let r = rh.execute(core_id, parameters);
-        if let Ok(mut r) = r {
-            if rh.predict(parameters.db) < lh.predict(parameters.db) {
-                l.append(&mut r);
-                Ok(l)
-            } else {
-                r.append(&mut l);
-                Ok(r)
-            }
-        } else {
-            r
-        }
-    } else {
-        l
+    match predicate {
+        None => bag.execute(core_id, parameters),
+        Some(predicate) => bag.filter(predicate, core_id, parameters),
     }
 }
 
 fn bag<'c>(
-    core_id: &str,
-    parameters: &CoreQueryParameters<'c>,
-    bags: &[Bag],
+    core_id: &'c str,
+    parameters: &'c CoreQueryParameters<'c>,
+    bags: &'c [Bag],
 ) -> mercator_db::ResultSet<'c> {
-    let mut v = vec![];
+    let mut results = Vec::new();
     for bag in bags {
-        let b = bag.execute(core_id, parameters);
-        match b {
-            e @ Err(_) => {
-                return e;
-            }
-            Ok(mut b) => {
-                v.append(&mut b);
-            }
-        }
+        let mut result = bag.execute(core_id, parameters)?;
+        results.append(&mut result);
     }
 
-    Ok(v)
-}
-
-fn inside<'c>(
-    parameters: &CoreQueryParameters<'c>,
-    core: &'c Core,
-    shape: &Shape,
-) -> mercator_db::ResultSet<'c> {
-    let db = parameters.db;
-    let param = match shape {
-        Shape::Point(space_id, position) => {
-            let space = db.space(space_id)?;
-            let position: Vec<f64> = position.into();
-            let position = space.encode(&position)?;
-            Ok((space_id, space::Shape::Point(position)))
-        }
-        Shape::HyperRectangle(space_id, bounding_box) => {
-            if bounding_box.len() != 2 {
-                Err("The number of position is different from 2, which is unsupported.".to_string())
-            } else {
-                let space = db.space(space_id)?;
-                let low: Vec<f64> = (&bounding_box[0]).into();
-                let high: Vec<f64> = (&bounding_box[1]).into();
-                let low = space.encode(&low)?;
-                let high = space.encode(&high)?;
-
-                Ok((space_id, space::Shape::BoundingBox(low, high)))
-            }
-        }
-        Shape::HyperSphere(space_id, position, radius) => {
-            let space = db.space(space_id)?;
-            let position: Vec<f64> = position.into();
-            let position = space.encode(&position)?;
-            let mut r = vec![];
-            for _ in 0..position.dimensions() {
-                r.push(radius.into());
-            }
-            let radius = space.encode(&r)?[0];
-
-            //FIXME: RADIUS IS A LENGTH, HOW TO ENCODE IT INTO THE SPACE?
-            Ok((space_id, space::Shape::HyperSphere(position, radius)))
-        }
-        Shape::Label(_, id) => {
-            // Not a real shape, so short circuit and return.
-            return core.get_by_label(parameters, id);
-        }
-        Shape::Nifti(_space_id) => Err("Inside-Nifti: not yet implemented".to_string()),
-    };
-
-    match param {
-        Ok((space_id, shape)) => core.get_by_shape(parameters, &shape, space_id),
-        Err(e) => Err(e),
-    }
-}
-
-fn outside<'c>(
-    parameters: &CoreQueryParameters<'c>,
-    core: &'c Core,
-    shape: &Shape,
-) -> mercator_db::ResultSet<'c> {
-    match shape {
-        Shape::Point(space_id, position) => {
-            let position: Vec<f64> = position.into();
-            match core.get_by_positions(parameters, &[position.into()], space_id) {
-                e @ Err(_) => e,
-                Ok(inside) => complement_helper(core, parameters, space_id, inside),
-            }
-        }
-        Shape::HyperRectangle(space_id, bounding_box) => {
-            // We need to adapt the bounding_box to ensure the
-            // surface will not hit as part of the inside set, so we
-            // compute the biggest bounding box contained within the
-            // given box.
-
-            // Smallest increment possible
-            let mut increment = Vec::with_capacity(bounding_box[0].dimensions());
-            for _ in 0..bounding_box[0].dimensions() {
-                increment.push(std::f64::EPSILON);
-            }
-
-            // Add it to the lower bound
-            let mut low: space::Position = (&bounding_box[0]).into();
-            low += increment.clone().into();
-
-            // Substract it from the upper bound
-            let mut high: space::Position = (&bounding_box[1]).into();
-            high -= increment.into();
-
-            match core.get_by_shape(parameters, &space::Shape::BoundingBox(low, high), space_id) {
-                e @ Err(_) => e,
-                Ok(inside) => complement_helper(core, parameters, space_id, inside),
-            }
-        }
-        Shape::HyperSphere(space_id, center, radius) => {
-            // Smallest decrement possible, to exclude the surface
-            let mut radius: f64 = radius.into();
-            radius -= std::f64::EPSILON;
-            let center: space::Position = center.into();
-
-            match core.get_by_shape(
-                parameters,
-                &space::Shape::HyperSphere(center, radius.into()),
-                space_id,
-            ) {
-                e @ Err(_) => e,
-                Ok(inside) => complement_helper(core, parameters, space_id, inside),
-            }
-        }
-        Shape::Label(_, _) => Err("Label: not yet implemented".to_string()),
-        Shape::Nifti(_space_id) => Err("Outside-nifti: not yet implemented".to_string()),
-    }
+    Ok(results)
 }
 
 impl<'e> Executor<'e> for Projection {
     type ResultSet = mercator_db::ResultSet<'e>;
 
-    fn execute<'f: 'e>(
-        &self,
-        core_id: &str,
-        parameters: &CoreQueryParameters<'f>,
+    fn execute(
+        &'e self,
+        core_id: &'e str,
+        parameters: &'e CoreQueryParameters<'e>,
     ) -> Self::ResultSet {
         match self {
             Projection::Nifti(_, _, _bag) => Err("Proj-Nifti: not yet implemented".to_string()),
@@ -375,27 +364,26 @@ impl<'e> Executor<'e> for Projection {
 impl<'e> Executor<'e> for Bag {
     type ResultSet = mercator_db::ResultSet<'e>;
 
-    fn execute<'f: 'e>(
-        &self,
-        core_id: &str,
-        parameters: &CoreQueryParameters<'f>,
+    fn execute(
+        &'e self,
+        core_id: &'e str,
+        parameters: &'e CoreQueryParameters<'e>,
     ) -> Self::ResultSet {
         let core = parameters.db.core(core_id)?;
 
         match self {
-            Bag::ViewPort(bag) => view_port(core_id, parameters, bag),
-            Bag::Distinct(bag) => distinct(core_id, parameters, bag),
+            Bag::Distinct(bag) => bag.distinct(core_id, parameters),
             Bag::Filter(predicate, bag) => filter(core_id, parameters, predicate, bag),
-            Bag::Complement(bag) => complement(core_id, parameters, core, bag),
-            Bag::Intersection(lh, rh) => intersection(core_id, parameters, rh, lh),
-            Bag::Union(lh, rh) => union(core_id, parameters, rh, lh),
+            Bag::Complement(bag) => bag.complement(core_id, parameters, core),
+            Bag::Intersection(lh, rh) => lh.intersection(core_id, parameters, rh),
+            Bag::Union(lh, rh) => lh.union(core_id, parameters, rh),
             Bag::Bag(list) => bag(core_id, parameters, list),
-            Bag::Inside(shape) => inside(parameters, core, shape),
+            Bag::Inside(shape) => shape.inside(parameters, core),
             Bag::Outside(shape) => {
                 //FIXME: This is currently computed as the complement of the values within the shape, except its surface.
                 //       Should this be instead a list of positions within the shape?
                 //FIXME: Should we use the Shape's Space to get the maximum bounds or the output Space requested?
-                outside(parameters, core, shape)
+                shape.outside(parameters, core)
             }
         }
     }

@@ -59,6 +59,8 @@ pub use expressions::Predictor;
 pub use expressions::Validator;
 pub use queries::FiltersParser;
 pub use queries::QueryParser;
+pub use symbols::Bag;
+pub use symbols::Projection;
 pub use validators::ValidationResult;
 
 #[cfg(test)]

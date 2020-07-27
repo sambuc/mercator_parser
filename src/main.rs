@@ -93,12 +93,17 @@ fn main() {
                             execute = t.execute(core, &parameters);
                         }
 
-                        if let Ok(r) = execute {
-                            //let r = mercator_db::json::model::to_spatial_objects(r);
-                            info!("Execution: \n{:#?}", r);
-                            info!("NB results: {:?}", r.len());
-                        } else {
-                            info!("Execution: \n{:?}", execute);
+                        match execute {
+                            Ok(r) => {
+                                let r = r
+                                    .into_iter()
+                                    .map(|(space, objects)| (space, objects.collect::<Vec<_>>()))
+                                    .collect::<Vec<_>>();
+
+                                info!("Execution: \n{:#?}", r);
+                                info!("NB results: {:?}", r[0].1.len());
+                            }
+                            Err(e) => info!("Execution: \n{:?}", e),
                         }
                     }
                 }
