@@ -29,23 +29,23 @@ name = "parser-driver"
 path = "src/main.rs"
 required-features = ["bin"]
 
+[profile.release]
+lto = true
+
 [features]
 bin = ["measure_time", "pretty_env_logger"]
 
 [dependencies]
-mercator_db = "^0.1"
-
-lalrpop-util = "^0.17"
-regex = "^1.2"
+mercator_db = "0.1"
+lalrpop-util = "0.19.0"
 
 # Logging macros API
-#log = { version = "^0.4", features = ["max_level_trace", "release_max_level_info"] }
-log = { version = "^0.4", features = ["max_level_trace", "release_max_level_trace"] }
+#log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_trace"] }
 
 # Used for main.rs
-pretty_env_logger =  { version = "^0.3", optional = true }  # Logger implementation
-measure_time = { version = "^0.6", optional = true }  # To mesure parsing time, only required by binary
+pretty_env_logger =  { version = "0.3", optional = true }  # Logger implementation
+measure_time = { version = "0.6", optional = true }  # To mesure parsing time, only required by binary
 
 [build-dependencies]
-lalrpop = "^0.17.1"
-
+lalrpop = { version = "0.19.0", features = ["lexer"] }
