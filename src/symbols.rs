@@ -11,14 +11,14 @@ pub use super::types::*;
 #[derive(Clone, Debug)]
 pub enum Projection {
     Nifti(String, LiteralSelector, Bag),
-    JSON(String, JsonValue, Bag),
+    Json(String, JsonValue, Bag),
 }
 
 impl Projection {
     pub fn space(&self) -> &String {
         match self {
-            Projection::Nifti(space, _, _) => &space,
-            Projection::JSON(space, _, _) => &space,
+            Projection::Nifti(space, _, _) => space,
+            Projection::Json(space, _, _) => space,
         }
     }
 }
@@ -138,7 +138,7 @@ impl Shape {
 
     pub fn volume(&self) -> f64 {
         match self {
-            Shape::Point(_, _) => std::f64::EPSILON, // The smallest non-zero volume possible
+            Shape::Point(_, _) => f64::EPSILON, // The smallest non-zero volume possible
             Shape::HyperRectangle(_space, pos) => {
                 //TODO: At this time, only aligned to the axes, defined by two points, hyperrectangles are supported.
                 assert_eq!(pos.len(), 2);
@@ -202,7 +202,7 @@ impl Shape {
             }
             Shape::Label(_, _) => {
                 // FIXME: Needs to find a way to figure out the approximate volume of this specific ID, or return MAX or MIN..
-                std::f64::EPSILON
+                f64::EPSILON
             }
             Shape::Nifti(_) => unimplemented!("Nifti"),
         }
@@ -238,9 +238,7 @@ impl Position {
                     Ordering::Less => -1,
                 };
 
-                let mut v = Vec::with_capacity(1);
-                v.push(LiteralNumber::Int(x));
-
+                let v = vec![LiteralNumber::Int(x)];
                 LiteralPosition(v)
             }
         }

@@ -7,7 +7,7 @@ impl Predictor for Projection {
     fn predict(&self, db: &DataBase) -> Result<f64, String> {
         match self {
             Projection::Nifti(_, _, bag) => bag.predict(db),
-            Projection::JSON(_, _, bag) => bag.predict(db),
+            Projection::Json(_, _, bag) => bag.predict(db),
         }
     }
 }

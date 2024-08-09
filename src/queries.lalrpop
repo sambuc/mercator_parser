@@ -51,7 +51,7 @@ JsonOperator: symbols::Projection = {
             None => Space::universe().name().clone(),
         };
 
-        symbols::Projection::JSON(space_id, f, b)
+        symbols::Projection::Json(space_id, f, b)
     }
 };
 

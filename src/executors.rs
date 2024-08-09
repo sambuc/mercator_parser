@@ -260,8 +260,7 @@ impl Shape {
         let (space_id, inside) = match self {
             Shape::Point(space_id, position) => {
                 let position: Vec<f64> = position.into();
-                let mut positions = Vec::with_capacity(1);
-                positions.push(position.into());
+                let positions = vec![position.into()];
                 let inside = core.get_by_positions(parameters, positions, space_id)?;
 
                 Ok((space_id, inside))
@@ -275,7 +274,7 @@ impl Shape {
                 // Smallest increment possible
                 let mut increment = Vec::with_capacity(bounding_box[0].dimensions());
                 for _ in 0..bounding_box[0].dimensions() {
-                    increment.push(std::f64::EPSILON);
+                    increment.push(f64::EPSILON);
                 }
 
                 // Add it to the lower bound
@@ -294,7 +293,7 @@ impl Shape {
             Shape::HyperSphere(space_id, center, radius) => {
                 // Smallest decrement possible, to exclude the surface
                 let mut radius: f64 = radius.into();
-                radius -= std::f64::EPSILON;
+                radius -= f64::EPSILON;
                 let center: space::Position = center.into();
 
                 let inside = core.get_by_shape(
@@ -353,7 +352,7 @@ impl<'e> Executor<'e> for Projection {
     ) -> Self::ResultSet {
         match self {
             Projection::Nifti(_, _, _bag) => Err("Proj-Nifti: not yet implemented".to_string()),
-            Projection::JSON(_, _format, bag) => {
+            Projection::Json(_, _format, bag) => {
                 bag.execute(core_id, parameters)
                 // FIXME: Add projections here
             }

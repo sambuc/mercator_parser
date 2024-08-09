@@ -37,15 +37,18 @@ bin = ["measure_time", "pretty_env_logger"]
 
 [dependencies]
 mercator_db = "0.1"
-lalrpop-util = "0.19.0"
+
+lalrpop-util = "0.20"
+regex = "1.10"
 
 # Logging macros API
 #log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_trace"] }
 
 # Used for main.rs
-pretty_env_logger =  { version = "0.3", optional = true }  # Logger implementation
-measure_time = { version = "0.6", optional = true }  # To mesure parsing time, only required by binary
+pretty_env_logger =  { version = "0.5", optional = true }  # Logger implementation
+measure_time = { version = "0.8", optional = true }  # To mesure parsing time, only required by binary
 
 [build-dependencies]
-lalrpop = { version = "0.19.0", features = ["lexer"] }
+lalrpop = "0.20"
+
