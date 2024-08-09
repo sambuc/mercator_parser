@@ -9,7 +9,7 @@ impl Validator for Projection {
     fn validate(&self) -> ValidationResult {
         match self {
             Projection::Nifti(_, _, _) => Err("not yet implemented".to_string()),
-            Projection::JSON(_, _format, bag) => bag.validate(),
+            Projection::Json(_, _format, bag) => bag.validate(),
             //FIXME: Add support for projections
             /* match format.validate() {
                 Ok(_) => bag.validate(),

@@ -38,20 +38,20 @@ lalrpop_mod!(#[allow(clippy::all,unused_parens)] pub queries); // synthesized by
 //       as well.
 //       Instead we enable it per modules below, except for the tests.
 
-#[warn(missing_docs)]
+//#[warn(missing_docs)]
 mod evaluators;
-#[warn(missing_docs)]
+//#[warn(missing_docs)]
 mod executors;
-#[warn(missing_docs)]
+//#[warn(missing_docs)]
 mod expressions;
-#[warn(missing_docs)]
+//#[warn(missing_docs)]
 mod predictors;
-#[warn(missing_docs)]
+//#[warn(missing_docs)]
 mod validators;
 
-#[warn(missing_docs)]
+//#[warn(missing_docs)]
 mod symbols;
-#[warn(missing_docs)]
+//#[warn(missing_docs)]
 mod types;
 
 pub use expressions::Executor;

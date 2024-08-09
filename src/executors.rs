@@ -38,12 +38,10 @@ fn complement_helper<'c>(
 
             Ok(points
                 .into_iter()
-                .filter_map(|(space, v)| match hashmap.get(space) {
-                    None => None,
-                    Some(list) => {
-                        Some((space, v.into_iter().filter(|t| !list.contains(t)).collect()))
-                    }
-                })
+                .filter_map(|(space, v)|
+                    hashmap.get(space).map(|list|
+                        (space, v.into_iter().filter(|t|
+                            !list.contains(t)).collect())))
                 .collect::<Vec<_>>())
         }
     }
@@ -74,7 +72,7 @@ fn distinct<'c>(
         e @ Err(_) => e,
         Ok(mut v) => {
             let set: HashSet<_> = v.drain(..).collect(); // dedup
-            v.extend(set.into_iter());
+            v.extend(set);
 
             Ok(v)
         }
@@ -318,7 +316,7 @@ fn outside<'c>(
             // Smallest increment possible
             let mut increment = Vec::with_capacity(bounding_box[0].dimensions());
             for _ in 0..bounding_box[0].dimensions() {
-                increment.push(std::f64::EPSILON);
+                increment.push(f64::EPSILON);
             }
 
             // Add it to the lower bound
@@ -337,7 +335,7 @@ fn outside<'c>(
         Shape::HyperSphere(space_id, center, radius) => {
             // Smallest decrement possible, to exclude the surface
             let mut radius: f64 = radius.into();
-            radius -= std::f64::EPSILON;
+            radius -= f64::EPSILON;
             let center: space::Position = center.into();
 
             match core.get_by_shape(
@@ -364,7 +362,7 @@ impl<'e> Executor<'e> for Projection {
     ) -> Self::ResultSet {
         match self {
             Projection::Nifti(_, _, _bag) => Err("Proj-Nifti: not yet implemented".to_string()),
-            Projection::JSON(_, _format, bag) => {
+            Projection::Json(_, _format, bag) => {
                 bag.execute(core_id, parameters)
                 // FIXME: Add projections here
             }
