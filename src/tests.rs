@@ -16,7 +16,7 @@ mod parsing {
         fn query() {
             let p = query_parser();
 
-            let nifti = "nifti(point{[0]})";
+            let nifti = "nifti(inside(point{[0]}))";
 
             // Option is Empty
             assert!(p.parse("").is_ok());
@@ -47,14 +47,14 @@ mod parsing {
             let p = query_parser();
 
             // Check allowed forms of the operator
-            assert!(p.parse("nifti(point{[0]})").is_ok());
-            assert!(p.parse("nifti(.properties.id, point{[0]})").is_ok());
+            assert!(p.parse("nifti(inside(point{[0]}))").is_ok());
+            assert!(p.parse("nifti(.properties.id, inside(point{[0]}))").is_ok());
 
             unimplemented!(); // TO REMEMBER SOME WORK IS DUE HERE.
 
             //FIXME: THIS SHOULD BE ALLOWED
-            assert!(p.parse("nifti(2, point{[0]})").is_ok());
-            assert!(p.parse("nifti(2.23, point{[0]})").is_ok());
+            assert!(p.parse("nifti(2, inside(point{[0]}))").is_ok());
+            assert!(p.parse("nifti(2.23, inside(point{[0]}))").is_ok());
 
             //FIXME: SYNTAX OK, TYPE NOT
             assert!(p.parse("nifti(point{[0], \"space\"})").is_err());
@@ -64,16 +64,16 @@ mod parsing {
         fn json_operator() {
             let p = query_parser();
 
-            assert!(p.parse("json(true, point{[0]})").is_ok());
-            assert!(p.parse("json(23, point{[0]})").is_ok());
-            assert!(p.parse("json([23, 24], point{[0]})").is_ok());
-            assert!(p.parse("json([23, count(.)], point{[0]})").is_ok());
+            assert!(p.parse("json(true, inside(point{[0]}))").is_ok());
+            assert!(p.parse("json(23, inside(point{[0]}))").is_ok());
+            assert!(p.parse("json([23, 24], inside(point{[0]}))").is_ok());
+            assert!(p.parse("json([23, count(.)], inside(point{[0]}))").is_ok());
 
             assert!(p.parse("json(true)").is_err());
             assert!(p.parse("json(true,)").is_err());
 
-            assert!(p.parse("json(, point{[0]})").is_err());
-            assert!(p.parse("json(point{[0]})").is_err());
+            assert!(p.parse("json(, inside(point{[0]}))").is_err());
+            assert!(p.parse("json(inside(point{[0]}))").is_err());
 
             assert!(p.parse("json(true, point)").is_err());
         }
@@ -83,24 +83,24 @@ mod parsing {
             let p = query_parser();
 
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "true").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "true").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "false").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "false").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "null").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "null").as_str())
                 .is_ok());
 
             // Incorrect capitalisation
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "True").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "True").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "False").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "False").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "Null").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "Null").as_str())
                 .is_err());
         }
 
@@ -109,24 +109,24 @@ mod parsing {
             let p = query_parser();
 
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{}").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{}").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{\"field\": 0}").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{\"field\": 0}").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{\"field\": 0, \"field1\": 1}").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{\"field\": 0, \"field1\": 1}").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{\"field\": [0, 1]}").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{\"field\": [0, 1]}").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{\"field\": {\"field1\": 0}}").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{\"field\": {\"field1\": 0}}").as_str())
                 .is_ok());
             assert!(p
                 .parse(
                     format!(
-                        "json({}, point{{[0]}})",
+                        "json({}, inside(point{{[0]}}))",
                         "{\"field\": [{\"field1\": 0}, {\"field1\": 1}]}"
                     )
                     .as_str()
@@ -139,25 +139,25 @@ mod parsing {
             let p = query_parser();
 
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{:}").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{:}").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{field: 0}").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{field: 0}").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{0: 0}").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{0: 0}").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{\"0\": }").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{\"0\": }").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{\"0\": 0 }").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{\"0\": 0 }").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{\"field\": 0 }").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{\"field\": 0 }").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "{\"field\": \"0\" }").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "{\"field\": \"0\" }").as_str())
                 .is_ok());
         }
 
@@ -166,20 +166,20 @@ mod parsing {
             let p = query_parser();
 
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "[, 0]").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "[, 0]").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "[]").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "[]").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "[0]").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "[0]").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "[0, 1]").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "[0, 1]").as_str())
                 .is_ok());
             assert!(p
                 .parse(
-                    format!("json({}, point{{[0]}})", "[{\"field\": 0}, {\"field\": 1}]").as_str()
+                    format!("json({}, inside(point{{[0]}}))", "[{\"field\": 0}, {\"field\": 1}]").as_str()
                 )
                 .is_ok());
         }
@@ -190,40 +190,40 @@ mod parsing {
 
             // count ()
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "count()").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "count()").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "count(distinct)").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "count(distinct)").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "count(.)").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "count(.)").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "count(distinct .)").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "count(distinct .)").as_str())
                 .is_ok());
 
             // sum ()
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "sum()").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "sum()").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "sum(.)").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "sum(.)").as_str())
                 .is_ok());
 
             // min ()
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "min()").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "min()").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "min(.)").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "min(.)").as_str())
                 .is_ok());
 
             // max ()
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "max()").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "max()").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "max(.)").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "max(.)").as_str())
                 .is_ok());
         }
 
@@ -233,42 +233,42 @@ mod parsing {
 
             // Integers
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "0").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "0").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "+0").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "+0").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "-0").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "-0").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "1").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "1").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "+1").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "+1").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "-1").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "-1").as_str())
                 .is_ok());
 
             // Floating point values
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "0.0").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "0.0").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "+0.0").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "+0.0").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "-0.0").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "-0.0").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "0.1").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "0.1").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "+0.01").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "+0.01").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("json({}, point{{[0]}})", "-0.01").as_str())
+                .parse(format!("json({}, inside(point{{[0]}}))", "-0.01").as_str())
                 .is_ok());
         }
     }
@@ -290,7 +290,7 @@ mod parsing {
 
             assert!(p.parse("").is_err());
 
-            assert!(p.parse("point{[0]}").is_ok());
+            assert!(p.parse("inside(point{[0]})").is_ok());
         }
 
         /* Not useful to test this rule
@@ -305,7 +305,7 @@ mod parsing {
 
             assert!(p.parse("distinct()").is_err());
 
-            assert!(p.parse("distinct(point{[0]})").is_ok());
+            assert!(p.parse("distinct(inside(point{[0]}))").is_ok());
         }
 
         #[test]
@@ -314,7 +314,7 @@ mod parsing {
 
             assert!(p.parse("complement()").is_err());
 
-            assert!(p.parse("complement(point{[0]})").is_ok());
+            assert!(p.parse("complement(inside(point{[0]}))").is_ok());
         }
 
         #[test]
@@ -322,12 +322,12 @@ mod parsing {
             let p = filters_parser();
 
             assert!(p.parse("intersection()").is_err());
-            assert!(p.parse("intersection(point{[0]})").is_err());
+            assert!(p.parse("intersection(inside(point{[0]}))").is_err());
             assert!(p
-                .parse("intersection(point{[0]}, point{[0]}, point{[0]})")
+                .parse("intersection(inside(point{[0]}), inside(point{[0]}), inside(point{[0]}))")
                 .is_err());
 
-            assert!(p.parse("intersection(point{[0]}, point{[0]})").is_ok());
+            assert!(p.parse("intersection(inside(point{[0]}), inside(point{[0]}))").is_ok());
         }
 
         #[test]
@@ -335,12 +335,12 @@ mod parsing {
             let p = filters_parser();
 
             assert!(p.parse("union()").is_err());
-            assert!(p.parse("union(point{[0]})").is_err());
+            assert!(p.parse("union(inside(point{[0]}))").is_err());
             assert!(p
-                .parse("union(point{[0]}, point{[0]}, point{[0]})")
+                .parse("union(inside(point{[0]}), inside(point{[0]}), inside(point{[0]}))")
                 .is_err());
 
-            assert!(p.parse("union(point{[0]}, point{[0]})").is_ok());
+            assert!(p.parse("union(inside(point{[0]}), inside(point{[0]}))").is_ok());
         }
 
         #[test]
@@ -348,10 +348,10 @@ mod parsing {
             let p = filters_parser();
 
             assert!(p.parse("filter()").is_err());
-            assert!(p.parse("filter(point{[0]})").is_ok());
+            assert!(p.parse("filter(inside(point{[0]}))").is_ok());
             assert!(p.parse("filter(=(., [0]))").is_ok());
 
-            assert!(p.parse("filter(=(., [0]), point{[0]})").is_ok());
+            assert!(p.parse("filter(=(., [0]), inside(point{[0]}))").is_ok());
         }
 
         /* Not useful to test this rule
@@ -365,17 +365,17 @@ mod parsing {
             let p = filters_parser();
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "<(., [0])").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "<(., [0])").as_str())
                 .is_ok());
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "<(, [0])").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "<(, [0])").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "<(.)").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "<(.)").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "<()").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "<()").as_str())
                 .is_err());
         }
 
@@ -384,17 +384,17 @@ mod parsing {
             let p = filters_parser();
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", ">(., [0])").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", ">(., [0])").as_str())
                 .is_ok());
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", ">(, [0])").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", ">(, [0])").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", ">(.)").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", ">(.)").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", ">()").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", ">()").as_str())
                 .is_err());
         }
 
@@ -403,17 +403,17 @@ mod parsing {
             let p = filters_parser();
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "=(., [0])").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "=(., [0])").as_str())
                 .is_ok());
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "=(, [0])").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "=(, [0])").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "=(.)").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "=(.)").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "=()").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "=()").as_str())
                 .is_err());
         }
 
@@ -422,11 +422,11 @@ mod parsing {
             let p = filters_parser();
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "!(=(., [0]))").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "!(=(., [0]))").as_str())
                 .is_ok());
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "!()").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "!()").as_str())
                 .is_err());
         }
 
@@ -435,17 +435,17 @@ mod parsing {
             let p = filters_parser();
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "&(=(., [0]), =(., [0]))").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "&(=(., [0]), =(., [0]))").as_str())
                 .is_ok());
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "&(, =(., [0]))").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "&(, =(., [0]))").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "&(|(=(., [0])))").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "&(|(=(., [0])))").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "&()").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "&()").as_str())
                 .is_err());
         }
 
@@ -454,17 +454,17 @@ mod parsing {
             let p = filters_parser();
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "|(=(., [0]), =(., [0]))").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "|(=(., [0]), =(., [0]))").as_str())
                 .is_ok());
 
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "|(, =(., [0]))").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "|(, =(., [0]))").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "|(|(=(., [0])))").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "|(|(=(., [0])))").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter({}, point{{[0]}})", "|()").as_str())
+                .parse(format!("filter({}, inside(point{{[0]}}))", "|()").as_str())
                 .is_err());
         }
 
@@ -474,11 +474,11 @@ mod parsing {
 
             assert!(p.parse("bag{}").is_err());
 
-            assert!(p.parse("bag{point{[0]}}").is_ok());
-            assert!(p.parse("bag{point{[0]}, point{[0]}}").is_ok());
-            assert!(p.parse("bag{point{[0]}, point{[0]}, point{[0]}}").is_ok());
+            assert!(p.parse("bag{inside(point{[0]})}").is_ok());
+            assert!(p.parse("bag{inside(point{[0]}), inside(point{[0]})}").is_ok());
+            assert!(p.parse("bag{inside(point{[0]}), inside(point{[0]}), inside(point{[0]})}").is_ok());
             assert!(p
-                .parse("bag{point{[0]}, hypersphere{[0], 1}, hyperrectangle{[0], [1]}}")
+                .parse("bag{inside(point{[0]}), inside(hypersphere{[0], 1}), inside(hyperrectangle{[0], [1]})}")
                 .is_ok());
         }
 
@@ -518,21 +518,21 @@ mod parsing {
             // At least two positions when it is aligned with the axis, otherwise an even number
             // of positions, as the number of vertices follows the rule 2**k, where k is the number
             // of dimensions of the space containing the hyperrectangle.
-            assert!(p.parse("hyperrectangle{}").is_err());
-            assert!(p.parse("hyperrectangle{[]}").is_err());
-            assert!(p.parse("hyperrectangle{[0]}").is_err());
-            assert!(p.parse("hyperrectangle{[0], [1], [2]}").is_err());
-            assert!(p.parse("hyperrectangle{[0], [1], [2], [3], [4]}").is_err());
+            assert!(p.parse("inside(hyperrectangle{})").is_err());
+            assert!(p.parse("inside(hyperrectangle{[]})").is_err());
+            assert!(p.parse("inside(hyperrectangle{[0]})").is_err());
+            assert!(p.parse("inside(hyperrectangle{[0], [1], [2]})").is_err());
+            assert!(p.parse("inside(hyperrectangle{[0], [1], [2], [3], [4]})").is_err());
 
-            assert!(p.parse("hyperrectangle{[0], [1]}").is_ok());
-            assert!(p.parse("hyperrectangle{[0], [1], \"space\"}").is_ok());
-            assert!(p.parse("hyperrectangle{[0], [1], [2], [3]}").is_ok());
-            assert!(p.parse("hyperrectangle{[0], [1], [2], [3]}").is_ok());
+            assert!(p.parse("inside(hyperrectangle{[0], [1]})").is_ok());
+            assert!(p.parse("inside(hyperrectangle{[0], [1], \"space\"})").is_ok());
+            assert!(p.parse("inside(hyperrectangle{[0], [1], [2], [3]})").is_ok());
+            assert!(p.parse("inside(hyperrectangle{[0], [1], [2], [3]})").is_ok());
             assert!(p
-                .parse("hyperrectangle{[0], [1], [2], [3], [4], [5]}")
+                .parse("inside(hyperrectangle{[0], [1], [2], [3], [4], [5]})")
                 .is_ok());
             assert!(p
-                .parse("hyperrectangle{[0], [1], [2], [3], [4], [5], \"space\"}")
+                .parse("inside(hyperrectangle{[0], [1], [2], [3], [4], [5], \"space\"})")
                 .is_ok());
         }
 
@@ -540,23 +540,23 @@ mod parsing {
         fn hyperrsphere() {
             let p = filters_parser();
 
-            assert!(p.parse("hypersphere{}").is_err());
-            assert!(p.parse("hypersphere{[]}").is_err());
-            assert!(p.parse("hypersphere{[0]}").is_err());
+            assert!(p.parse("inside(hypersphere{}").is_err());
+            assert!(p.parse("inside(hypersphere{[]})").is_err());
+            assert!(p.parse("inside(hypersphere{[0]})").is_err());
 
-            assert!(p.parse("hypersphere{[0], 23}").is_ok());
-            assert!(p.parse("hypersphere{[0], 23, \"space\"}").is_ok());
+            assert!(p.parse("inside(hypersphere{[0], 23})").is_ok());
+            assert!(p.parse("inside(hypersphere{[0], 23, \"space\"})").is_ok());
         }
 
         #[test]
         fn point() {
             let p = filters_parser();
 
-            assert!(p.parse("point{}").is_err());
-            assert!(p.parse("point{[]}").is_err());
+            assert!(p.parse("inside(point{})").is_err());
+            assert!(p.parse("inside(point{[]})").is_err());
 
-            assert!(p.parse("point{[0]}").is_ok());
-            assert!(p.parse("point{[0], \"space\"}").is_ok());
+            assert!(p.parse("inside(point{[0]})").is_ok());
+            assert!(p.parse("inside(point{[0], \"space\"})").is_ok());
         }
 
         #[test]
@@ -579,30 +579,30 @@ mod parsing {
             assert!(p
                 .parse(
                     format!(
-                        "filter(=({}, [1]), point{{[0]}})",
+                        "filter(=({}, [1]), inside(point{{[0]}}))",
                         "str_cmp_ignore_case(.field, \"\")"
                     )
                     .as_str()
                 )
                 .is_ok());
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", "str_cmp(.field, \"\")").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", "str_cmp(.field, \"\")").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", ".field").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", ".field").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", "[0]").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", "[0]").as_str())
                 .is_ok());
 
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", "point{[0]}").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", "inside(point{[0]})").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", "{0}").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", "{0}").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", "").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", "").as_str())
                 .is_err());
         }*/
 
@@ -612,15 +612,15 @@ mod parsing {
 
             assert!(p
                 .parse(
-                    format!("filter(=({}, [1]), point{{[0]}})", "str_cmp(.field, \"\")").as_str()
+                    format!("filter(=({}, [1]), inside(point{{[0]}}))", "str_cmp(.field, \"\")").as_str()
                 )
                 .is_ok());
 
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", "str_cmp(.field)").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", "str_cmp(.field)").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", "str_cmp(\"\")").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", "str_cmp(\"\")").as_str())
                 .is_err());
         }
 
@@ -631,7 +631,7 @@ mod parsing {
             assert!(p
                 .parse(
                     format!(
-                        "filter(=({}, [1]), point{{[0]}})",
+                        "filter(=({}, [1]), inside(point{{[0]}}))",
                         "str_cmp_ignore_case(.field, \"\")"
                     )
                     .as_str()
@@ -641,7 +641,7 @@ mod parsing {
             assert!(p
                 .parse(
                     format!(
-                        "filter(=({}, [1]), point{{[0]}})",
+                        "filter(=({}, [1]), inside(point{{[0]}}))",
                         "str_cmp_ignore_case(.field)"
                     )
                     .as_str()
@@ -650,7 +650,7 @@ mod parsing {
             assert!(p
                 .parse(
                     format!(
-                        "filter(=({}, [1]), point{{[0]}})",
+                        "filter(=({}, [1]), inside(point{{[0]}}))",
                         "str_cmp_ignore_case(\"\")"
                     )
                     .as_str()
@@ -663,19 +663,19 @@ mod parsing {
             let p = filters_parser();
 
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", ".").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", ".").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", ".field").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", ".field").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", ".field.field").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", ".field.field").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", ".field[1].field").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", ".field[1].field").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(=({}, [1]), point{{[0]}})", ".field.field[1]").as_str())
+                .parse(format!("filter(=({}, [1]), inside(point{{[0]}}))", ".field.field[1]").as_str())
                 .is_ok());
         }
 
@@ -684,26 +684,26 @@ mod parsing {
             let p = filters_parser();
 
             // Empty
-            assert!(p.parse(format!("point{{{}}}", "[]").as_str()).is_err());
+            assert!(p.parse(format!("inside(point{{{}}})", "[]").as_str()).is_err());
 
             // Non-numerical coordinate:
-            assert!(p.parse(format!("point{{{}}}", "[aa]").as_str()).is_err());
+            assert!(p.parse(format!("inside(point{{{}}})", "[aa]").as_str()).is_err());
 
             assert!(p
-                .parse(format!("point{{{}}}", "[\"aa\"]").as_str())
+                .parse(format!("inside(point{{{}}})", "[\"aa\"]").as_str())
                 .is_err());
 
             // One or more coordinates
-            assert!(p.parse(format!("point{{{}}}", "[0]").as_str()).is_ok());
-            assert!(p.parse(format!("point{{{}}}", "[0, 0]").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{{}}})", "[0]").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{{}}})", "[0, 0]").as_str()).is_ok());
             assert!(p
-                .parse(format!("point{{{}}}", "[0, 0, 0]").as_str())
+                .parse(format!("inside(point{{{}}})", "[0, 0, 0]").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("point{{{}}}", "[0, 0, 0, 0]").as_str())
+                .parse(format!("inside(point{{{}}})", "[0, 0, 0, 0]").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("point{{{}}}", "[0,0,0,0]").as_str())
+                .parse(format!("inside(point{{{}}})", "[0,0,0,0]").as_str())
                 .is_ok());
         }
 
@@ -713,66 +713,66 @@ mod parsing {
 
             // Single dot
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".").as_str())
                 .is_ok());
 
             // Check first character is within allowed characters
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".a").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".a").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", "._").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", "._").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".2").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".2").as_str())
                 .is_err());
 
             // Check second character is within allowed characters
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".fa").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".fa").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f2").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f2").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f_").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f_").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f2").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f2").as_str())
                 .is_ok());
 
             // Check we can add subscript
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".[23]").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".[23]").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f[0]").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f[0]").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f[2]").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f[2]").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f[23]").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f[23]").as_str())
                 .is_ok());
 
             // Invalid index values
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f[2.3]").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f[2.3]").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f[02]").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f[02]").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f[-2]").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f[-2]").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f[2e2]").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f[2e2]").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f[2E2]").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f[2E2]").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("filter(<({}, [1]), point{{[0]}})", ".f[+2]").as_str())
+                .parse(format!("filter(<({}, [1]), inside(point{{[0]}}))", ".f[+2]").as_str())
                 .is_err());
         }
 
@@ -836,42 +836,42 @@ mod parsing {
 
             // Integers
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "0").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "0").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "+0").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "+0").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "-0").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "-0").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "1").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "1").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "+1").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "+1").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "-1").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "-1").as_str())
                 .is_err());
 
             // Floating point values
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "0.0").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "0.0").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "+0.0").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "+0.0").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "-0.0").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "-0.0").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "0.1").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "0.1").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "+0.01").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "+0.01").as_str())
                 .is_ok());
             assert!(p
-                .parse(format!("hypersphere{{[0],{}}}", "-0.01").as_str())
+                .parse(format!("inside(hypersphere{{[0],{}}})", "-0.01").as_str())
                 .is_err());
         }
 
@@ -880,20 +880,20 @@ mod parsing {
             let p = filters_parser();
 
             // Integers
-            assert!(p.parse(format!("point{{[{}]}}", "0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "+0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "-0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "+1").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "-1").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "+0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "-0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "+1").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "-1").as_str()).is_ok());
 
             // Floating point values
-            assert!(p.parse(format!("point{{[{}]}}", "0.0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "+0.0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "-0.0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "0.1").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "+0.01").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "-0.01").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "+0.0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "-0.0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.1").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "+0.01").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "-0.01").as_str()).is_ok());
         }
 
         #[test]
@@ -901,54 +901,54 @@ mod parsing {
             let p = filters_parser();
 
             // Integers
-            assert!(p.parse(format!("point{{[{}]}}", "0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1e2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1e+2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1e-2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1E2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "100").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1e2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1e+2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1e-2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1E2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "100").as_str()).is_ok());
 
-            assert!(p.parse(format!("point{{[{}]}}", "010").as_str()).is_err());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "010").as_str()).is_err());
 
             // Floating point values (normalized)
-            assert!(p.parse(format!("point{{[{}]}}", "0.0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "0.1").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "0.1e0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "0.1e2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "0.1e+2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "0.1e-2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "0.1E2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "0.1E23").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "0.01").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.1").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.1e0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.1e2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.1e+2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.1e-2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.1E2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.1E23").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.01").as_str()).is_ok());
 
-            assert!(p.parse(format!("point{{[{}]}}", "0.").as_str()).is_err());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "0.").as_str()).is_err());
             assert!(p
-                .parse(format!("point{{[{}]}}", "0.1E03").as_str())
+                .parse(format!("inside(point{{[{}]}})", "0.1E03").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("point{{[{}]}}", "0.1E0.3").as_str())
+                .parse(format!("inside(point{{[{}]}})", "0.1E0.3").as_str())
                 .is_err());
 
             // Floating point values (denormalized)
-            assert!(p.parse(format!("point{{[{}]}}", "1.0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1.1").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1.1e0").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1.1e2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1.1e+2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1.1e-2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1.1E2").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1.1E23").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "1.01").as_str()).is_ok());
-            assert!(p.parse(format!("point{{[{}]}}", "10.1").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1.0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1.1").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1.1e0").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1.1e2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1.1e+2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1.1e-2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1.1E2").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1.1E23").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1.01").as_str()).is_ok());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "10.1").as_str()).is_ok());
 
-            assert!(p.parse(format!("point{{[{}]}}", "1.").as_str()).is_err());
-            assert!(p.parse(format!("point{{[{}]}}", "01.1").as_str()).is_err());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "1.").as_str()).is_err());
+            assert!(p.parse(format!("inside(point{{[{}]}})", "01.1").as_str()).is_err());
             assert!(p
-                .parse(format!("point{{[{}]}}", "1.1E03").as_str())
+                .parse(format!("inside(point{{[{}]}})", "1.1E03").as_str())
                 .is_err());
             assert!(p
-                .parse(format!("point{{[{}]}}", "1.1E0.3").as_str())
+                .parse(format!("inside(point{{[{}]}})", "1.1E0.3").as_str())
                 .is_err());
         }
     }
